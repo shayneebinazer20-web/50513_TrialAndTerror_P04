@@ -1,0 +1,3291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FaultLine — Dependency Supply Chain Risk</title>
+<meta name="description" content="FaultLine maps your dependency tree, simulates compromise propagation on a live digital twin, and ranks the fixes that cut the most risk." />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M9.5,4.7 L16,4.8 L13,10 L18,14 L12,18 L17,23 L16,27.2 L9.5,27.3 L3,16 Z' fill='%231E6E6B'/%3E%3Cpath d='M9.5,4.7 L22.5,4.7 L29,16 L22.5,27.3 L9.5,27.3 L3,16 Z' fill='none' stroke='%2322201B' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#F3F0E9;
+    --bg-alt:#EBE7DD;
+    --surface:#FDFCFA;
+    --surface-2:#F7F4EE;
+    --line:#E1DACB;
+    --ink:#22201B;
+    --ink-2:#4A453C;
+    --muted:#8A8172;
+    --accent:#1E6E6B;
+    --accent-ink:#0E3D3B;
+    --accent-soft:#DCEEEC;
+    --sidebar-bg:#1C1A16;
+    --sidebar-ink:#EDE9DE;
+    --sidebar-muted:#9A9385;
+    --sidebar-active:#2A2721;
+    --crit:#B23A2E;
+    --crit-soft:#F6DEDA;
+    --high:#C97A25;
+    --high-soft:#F5E4CC;
+    --med:#B99327;
+    --med-soft:#F3ECCC;
+    --low:#4C7A4E;
+    --low-soft:#DEEBDD;
+    --cf:#3B6FA8;
+    --cf-soft:#DEE8F2;
+    --shadow: 0 1px 2px rgba(30,26,18,.07);
+    --shadow-lift: 0 1px 2px rgba(30,26,18,.06), 0 8px 24px -12px rgba(30,26,18,.22);
+    --radius: 14px;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --display: 'Montserrat', 'Arial Black', sans-serif;
+    --body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#17120E;
+      --bg-alt:#1D1712;
+      --surface:#221C16;
+      --surface-2:#291F18;
+      --line:#3A2E23;
+      --ink:#F1EADC;
+      --ink-2:#C9BDA9;
+      --muted:#8F8271;
+      --accent:#4FBDB6;
+      --accent-ink:#BEEFEA;
+      --accent-soft:#1F3D3A;
+      --sidebar-bg:#0F0C09;
+      --sidebar-ink:#F1EADC;
+      --sidebar-muted:#8F8271;
+      --sidebar-active:#221C16;
+      --crit:#E2685A;
+      --crit-soft:#3B211D;
+      --high:#E2A15A;
+      --high-soft:#3B2E1D;
+      --med:#D9C168;
+      --med-soft:#39331D;
+      --low:#7FB482;
+      --low-soft:#20301F;
+      --cf:#8FB3DE;
+      --cf-soft:#22344A;
+      --shadow: 0 1px 2px rgba(0,0,0,.35);
+    --shadow-lift: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px -14px rgba(0,0,0,.65);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#17120E;
+    --bg-alt:#1D1712;
+    --surface:#221C16;
+    --surface-2:#291F18;
+    --line:#3A2E23;
+    --ink:#F1EADC;
+    --ink-2:#C9BDA9;
+    --muted:#8F8271;
+    --accent:#4FBDB6;
+    --accent-ink:#BEEFEA;
+    --accent-soft:#1F3D3A;
+    --sidebar-bg:#0F0C09;
+    --sidebar-ink:#F1EADC;
+    --sidebar-muted:#8F8271;
+    --sidebar-active:#221C16;
+    --crit:#E2685A;
+    --crit-soft:#3B211D;
+    --high:#E2A15A;
+    --high-soft:#3B2E1D;
+    --med:#D9C168;
+    --med-soft:#39331D;
+    --low:#7FB482;
+    --low-soft:#20301F;
+    --cf:#8FB3DE;
+    --cf-soft:#22344A;
+    --shadow: 0 1px 2px rgba(0,0,0,.35);
+    --shadow-lift: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px -14px rgba(0,0,0,.65);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--body); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:var(--display); font-weight:600; text-wrap:balance; margin:0;}
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
+  a{color:inherit;}
+  button{font-family:var(--body);}
+
+  .app{display:grid; grid-template-columns:76px 1fr; min-height:100vh; transition:grid-template-columns .18s ease;}
+  .app:has(.sidebar:hover),.app:has(.sidebar:focus-within){grid-template-columns:232px 1fr;}
+  @media (max-width: 860px){ .app, .app:has(.sidebar:hover){grid-template-columns:1fr;} .sidebar{display:none;} }
+
+  .sidebar{background:var(--sidebar-bg); color:var(--sidebar-ink); padding:20px 14px; display:flex; flex-direction:column; gap:22px; overflow:hidden; white-space:nowrap; position:relative; z-index:20;}
+  .brand{display:flex; align-items:center; gap:10px; padding:2px 8px;}
+  .brand svg{flex:none;}
+  .brand-text{font-family:var(--display); font-weight:700; font-size:18px; letter-spacing:-.2px; opacity:1; transition:opacity .12s;}
+  .nav{display:flex; flex-direction:column; gap:2px; margin-top:6px;}
+  .nav-item{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:9px; color:var(--sidebar-muted); cursor:pointer; font-size:13.5px; font-weight:500; border:none; background:none; text-align:left; width:100%;}
+  .nav-item svg{flex:none; opacity:.85;}
+  .nav-item:hover{background:var(--sidebar-active); color:var(--sidebar-ink);}
+  .nav-item.active{background:var(--accent); color:#0B211F; font-weight:600;}
+  .nav-item.active svg{opacity:1;}
+  .nav-label{opacity:1; transition:opacity .1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; display:block;}
+  .app:not(:has(.sidebar:hover)):not(:has(.sidebar:focus-within)) .nav-label,
+  .app:not(:has(.sidebar:hover)):not(:has(.sidebar:focus-within)) .brand-text{opacity:0;}
+
+  .main{display:flex; flex-direction:column; min-width:0;}
+  .topbar{position:relative; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 26px; border-bottom:1px solid var(--line); background:var(--surface);}
+  .topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;pointer-events:none;
+    background:linear-gradient(90deg, transparent 0 6%, var(--accent) 6% 9%, transparent 9% 33%, var(--accent) 33% 37%, transparent 37% 61%, var(--accent) 61% 65%, transparent 65% 84%, var(--accent) 84% 88%, transparent 88% 100%);
+    opacity:.45;}
+  .topbar-left h1{font-size:19px;}
+  .topbar-left .sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .topbar-right{display:flex; align-items:center; gap:12px;}
+  .search{display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:8px 12px; color:var(--muted); font-size:13px; width:220px; transition:border-color .15s, box-shadow .15s;}
+  .search:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+  .search input{border:none; background:none; outline:none; color:var(--ink); font-size:13px; width:100%; font-family:var(--body);}
+  .btn{display:inline-flex; align-items:center; gap:7px; border-radius:9px; padding:9px 16px; font-size:13px; font-weight:600; border:1px solid transparent; cursor:pointer; transition:filter .15s, background .15s, transform .1s;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--accent); color:#08201E;}
+  .btn-primary:hover{filter:brightness(1.06);}
+  .btn-ghost{background:var(--surface-2); border-color:var(--line); color:var(--ink-2);}
+  .btn-ghost:hover{background:var(--bg-alt);}
+  .btn-ghost.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink);}
+  .avatar{width:32px; height:32px; border-radius:50%; background:var(--accent); color:#08201E; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; box-shadow:0 0 0 2px var(--surface), 0 0 0 3px var(--line); flex:none;}
+  .icon-btn{width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; background:var(--surface-2); border:1px solid var(--line); color:var(--ink-2); cursor:pointer; transition:border-color .15s, color .15s, background .15s;}
+  .icon-btn:hover{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft);}
+
+  .content{padding:22px 26px 40px; overflow:auto;}
+  .tab-bar{display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .tab{padding:9px 4px; margin-right:20px; font-size:13.5px; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer;}
+  .tab.active{color:var(--ink); border-color:var(--accent);}
+
+  .grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px;}
+  .grid2{display:grid; grid-template-columns:1.6fr 1fr; gap:16px; margin-bottom:16px; align-items:start;}
+  .grid2b{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; align-items:start;}
+  @media (max-width:980px){ .grid4{grid-template-columns:repeat(2,1fr);} .grid2,.grid2b{grid-template-columns:1fr;} }
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
+  .stat{display:flex; flex-direction:column; gap:8px; cursor:pointer; transition:border-color .15s, transform .12s, box-shadow .15s;}
+  .stat:hover{border-color:var(--accent); box-shadow:var(--shadow-lift); transform:translateY(-2px);}
+  .stat:active{transform:translateY(-1px) scale(.99);}
+  .stat-top{display:flex; align-items:center; gap:7px; color:var(--muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em;}
+  .stat-val{font-family:var(--mono); font-size:28px; font-weight:600; display:flex; align-items:baseline; gap:8px;}
+  .stat-val .of{font-size:14px; color:var(--muted); font-weight:500;}
+  .stat-sub{font-size:12px; color:var(--muted);}
+  .pill{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; letter-spacing:.01em;}
+  .pill-crit{background:var(--crit-soft); color:var(--crit);}
+  .pill-high{background:var(--high-soft); color:var(--high);}
+  .pill-med{background:var(--med-soft); color:var(--med);}
+  .pill-low{background:var(--low-soft); color:var(--low);}
+  .pill-accent{background:var(--accent-soft); color:var(--accent-ink);}
+
+  .card-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
+  .card-head h3{font-size:15px;}
+  .meta-small{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .link{font-size:12px; font-weight:600; color:var(--accent-ink); cursor:pointer; white-space:nowrap;}
+  .link:hover{text-decoration:underline;}
+
+  .graph-card{padding:0; overflow:hidden;}
+  .graph-toolbar{display:flex; align-items:center; justify-content:space-between; padding:16px 18px 10px;}
+  .graph-wrap{position:relative; height:420px; border-top:1px solid var(--line);}
+  .graph-wrap svg{width:100%; height:100%; display:block; cursor:grab;}
+  .legend{position:absolute; left:14px; top:14px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:9px 11px; font-size:11.5px; box-shadow:var(--shadow-lift); z-index:3;}
+  .legend-row{display:flex; align-items:center; gap:7px; padding:3px 4px; color:var(--ink-2); cursor:pointer; border-radius:6px; user-select:none;}
+  .legend-row:hover{background:var(--surface-2);}
+  .legend-row.off{color:var(--muted); opacity:.5;}
+  .legend-dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .zoom-ctl{position:absolute; right:14px; bottom:14px; display:flex; flex-direction:column; gap:5px; z-index:3;}
+  .zoom-btn{width:30px; height:30px; border-radius:8px; background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-lift); color:var(--ink-2); display:flex; align-items:center; justify-content:center; cursor:pointer; font-family:var(--mono); font-size:15px;}
+  .zoom-btn:hover{border-color:var(--accent); color:var(--accent-ink);}
+
+  .node-crit{filter:drop-shadow(0 0 0 rgba(178,58,46,0));}
+  @keyframes pulse-ring{0%{stroke-opacity:.55; stroke-width:2px;} 100%{stroke-opacity:0; stroke-width:14px;}}
+  .pulse{animation:pulse-ring 1.8s ease-out infinite;}
+  @media (prefers-reduced-motion: reduce){ .pulse{animation:none; stroke-opacity:.35;} }
+
+  .detail-panel{display:flex; flex-direction:column; gap:14px;}
+  .crit-head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+  .crit-name{display:flex; align-items:center; gap:10px;}
+  .crit-icon{width:38px; height:38px; border-radius:10px; background:var(--crit-soft); color:var(--crit); display:flex; align-items:center; justify-content:center; flex:none;}
+  .crit-name h3{font-size:16px;}
+  .crit-name .v{font-size:12px; color:var(--muted); font-family:var(--mono);}
+  .cve-line{font-size:12px; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; line-height:1.5;}
+  .cve-line b{color:var(--ink);}
+  .score-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:12px; color:var(--ink-2); font-weight:600;}
+  .score-bar-track{height:9px; border-radius:99px; background:var(--surface-2); border:1px solid var(--line); overflow:hidden;}
+  .score-bar-fill{height:100%; border-radius:99px;}
+  .factor-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px;}
+  .factor{background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:8px 6px; text-align:center;}
+  .factor .fv{font-family:var(--mono); font-weight:700; font-size:15px;}
+  .factor .fl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
+
+  .action-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line);}
+  .action-row:first-of-type{border-top:none; padding-top:2px;}
+  .action-check{width:22px; height:22px; border-radius:50%; border:2px solid var(--line); flex:none; display:flex; align-items:center; justify-content:center; color:var(--surface);}
+  .action-check.done{background:var(--low); border-color:var(--low);}
+  .action-body{flex:1; min-width:0;}
+  .action-title{font-size:13px; font-weight:600;}
+  .action-meta{font-size:11.5px; color:var(--muted); margin-top:1px;}
+  /* Highlights the top-ranked action in a ranked action-row list (the
+     Firebreak Optimizer) without breaking the shared row/divider pattern
+     used everywhere else -- the tint bleeds to the card's own edges instead
+     of sitting as a separate boxed-in row. */
+  .action-row-rec{background:var(--accent-soft); border-radius:9px; margin:0 -18px; padding:10px 18px; border-top-color:transparent;}
+  .action-row-rec + .action-row{border-top-color:transparent;}
+  .fb-delta{display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex:none;}
+  .fb-delta-num{font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--low); white-space:nowrap;}
+
+  .health-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--line); font-size:12.5px;}
+  .health-row:first-of-type{border-top:none;}
+  .health-label{display:flex; align-items:center; gap:8px; color:var(--ink-2);}
+  .health-dot{width:7px; height:7px; border-radius:50%;}
+
+  .subtab-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .subtab{padding:8px 14px; border-radius:8px; font-size:12.5px; font-weight:600; border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2); cursor:pointer; transition:border-color .15s, color .15s;}
+  .subtab:hover:not(.active){border-color:var(--accent); color:var(--ink);}
+  .subtab.active{background:var(--ink); color:var(--surface); border-color:var(--ink);}
+
+  .metric-row{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0;}
+  .metric-box{background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 12px;}
+  .metric-box .mv{font-family:var(--mono); font-size:20px; font-weight:700;}
+  .metric-box .ml{font-size:11px; color:var(--muted); margin-top:2px;}
+
+  /* Segmented scenario picker -- exactly one of the four "what if" types is
+     ever selected, so this reads as one control (like a tab strip) instead
+     of a stack of independent rows each carrying its own pre-computed number. */
+  .cf-seg{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;}
+  .cf-seg-btn{display:flex; align-items:center; gap:7px; padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2); font-size:12.5px; font-weight:600; cursor:pointer; transition:border-color .15s, background .15s, color .15s;}
+  .cf-seg-btn:hover{border-color:var(--cf); color:var(--ink);}
+  .cf-seg-btn.active{border-color:var(--cf); background:var(--cf-soft); color:var(--ink);}
+  .cf-seg-btn svg{flex:none; opacity:.85;}
+  .cf-icon{width:26px; height:26px; border-radius:7px; background:var(--accent-soft); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; flex:none;}
+  .cf-detail{border:1px solid var(--cf); background:var(--surface); border-radius:10px; padding:14px 16px;}
+  .cf-detail-head{display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;}
+  .cf-icon-lg{width:32px; height:32px; border-radius:8px; background:var(--cf); color:#fff;}
+  .cf-detail-title{flex:1; min-width:0; display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:13.5px; font-weight:700;}
+  .cf-detail-title select{padding:5px 9px; border-radius:7px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-size:12.5px; font-weight:600; font-family:var(--body); max-width:100%;}
+  .cf-badge{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--cf); flex:none; white-space:nowrap;}
+  .cf-badge svg{color:var(--cf);}
+  .cf-desc{font-size:12.5px; color:var(--ink-2); line-height:1.55; margin-bottom:12px;}
+
+  .live-card{margin-bottom:16px; display:flex; flex-direction:column; gap:0;}
+  .live-row{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+  .live-left{display:flex; align-items:center; gap:12px; min-width:0;}
+  .live-dot{width:10px; height:10px; border-radius:50%; flex:none; position:relative;}
+  .live-dot::after{content:''; position:absolute; inset:-4px; border-radius:50%; border:1.5px solid currentColor; opacity:0;}
+  .live-dot-idle{background:var(--muted); color:var(--muted);}
+  .live-dot-checking{background:var(--accent); color:var(--accent);}
+  .live-dot-checking::after{opacity:.6; animation:live-ping 1.4s ease-out infinite;}
+  .live-dot-ok{background:var(--low); color:var(--low);}
+  .live-dot-ok::after{opacity:.5; animation:live-ping 2.6s ease-out infinite;}
+  .live-dot-alert{background:var(--crit); color:var(--crit);}
+  .live-dot-alert::after{opacity:.6; animation:live-ping 1.4s ease-out infinite;}
+  .live-dot-error{background:var(--high); color:var(--high);}
+  @keyframes live-ping{0%{transform:scale(.6); opacity:.6;} 100%{transform:scale(1.8); opacity:0;}}
+  @media (prefers-reduced-motion: reduce){ .live-dot::after{animation:none !important; opacity:.35 !important;} }
+  .live-title{font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:8px;}
+  .live-status-text{font-size:12px; color:var(--muted); display:block; margin-top:2px;}
+  .live-status-text.live-status-ok{color:var(--low);}
+  .live-status-text.live-status-alert{color:var(--crit); font-weight:600;}
+  .live-status-text.live-status-error{color:var(--high);}
+  .live-time{font-size:10.5px; color:var(--muted); margin-top:2px; font-family:var(--mono);}
+  .live-findings{margin-top:14px; padding-top:12px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:8px;}
+  .live-finding-row{display:flex; align-items:flex-start; gap:12px; background:var(--crit-soft); border:1px solid var(--crit); border-radius:9px; padding:9px 12px;}
+  .live-finding-pkg{font-family:var(--mono); font-size:12px; font-weight:700; color:var(--crit); flex:none; min-width:110px;}
+  .live-finding-body{flex:1; min-width:0;}
+  .live-finding-id{font-size:12px; font-weight:600;}
+  .live-finding-id a{color:var(--accent-ink);}
+  .live-finding-summary{font-size:11.5px; color:var(--ink-2); margin-top:2px; line-height:1.45;}
+  .live-rec{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:11.5px; color:var(--ink-2);}
+  .live-rec b{color:var(--ink); font-weight:700;}
+  .live-rec-meta{color:var(--muted); margin-top:2px;}
+
+  .collapse-btn{background:none; border:none; cursor:pointer; color:var(--muted); display:flex; align-items:center; justify-content:center; padding:4px; border-radius:6px; transition:background .15s, color .15s; flex:none;}
+  .collapse-btn:hover{background:var(--surface-2); color:var(--ink);}
+  .collapse-btn svg{transition:transform .2s;}
+  .collapse-btn[aria-expanded="false"] svg{transform:rotate(-90deg);}
+  .collapsible-body{display:grid; grid-template-rows:1fr; transition:grid-template-rows .22s ease; min-height:0;}
+  .collapsible-body.is-collapsed{grid-template-rows:0fr;}
+  .collapsible-body > .collapsible-inner{overflow:hidden; min-height:0;}
+  @media (prefers-reduced-motion: reduce){ .collapsible-body{transition:none;} .collapse-btn svg{transition:none;} }
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; padding:8px 10px; border-bottom:1px solid var(--line);}
+  th.sortable{cursor:pointer; user-select:none; white-space:nowrap;}
+  th.sortable:hover{color:var(--ink-2);}
+  th.sortable .arrow{margin-left:3px; opacity:.6;}
+  td{padding:10px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr.row-hot{background:var(--accent-soft);}
+  tbody tr[data-seed]{transition:background .12s;}
+  tbody tr[data-seed]:hover{background:var(--surface-2);}
+  .table-wrap{overflow-x:auto;}
+
+  .slider-row{display:flex; align-items:center; gap:12px; margin-bottom:4px;}
+  input[type=range]{flex:1; -webkit-appearance:none; height:5px; border-radius:99px; background:var(--line); outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:17px; height:17px; border-radius:50%; background:var(--accent); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--accent); cursor:pointer;}
+  input[type=range]::-moz-range-thumb{width:11px; height:11px; border-radius:50%; background:var(--accent); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--accent); cursor:pointer;}
+  .slider-val{font-family:var(--mono); font-weight:700; font-size:15px; min-width:44px; text-align:right;}
+  .rank{width:22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink); font-family:var(--mono); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+
+  .empty-hint{font-size:12.5px; color:var(--muted); text-align:center; padding:30px 10px;}
+  .info-note{font-size:12px; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:10px; line-height:1.55;}
+  .meta-line{font-size:11.5px; color:var(--muted); margin-top:10px; padding-top:10px; border-top:1px solid var(--line);}
+  .meta-line b{color:var(--ink-2); font-weight:600;}
+  .badge-rec{display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accent-ink); background:var(--accent-soft); padding:2px 7px; border-radius:99px;}
+
+  ::-webkit-scrollbar{width:9px; height:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:99px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <div class="brand">
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+          <path d="M9.5,4.7 L16,4.8 L13,10 L18,14 L12,18 L17,23 L16,27.2 L9.5,27.3 L3,16 Z" fill="var(--accent)"/>
+          <path d="M16,4.8 L22.5,4.7 L29,16 L22.5,27.3 L16,27.2 L17,23 L12,18 L18,14 L13,10 Z" fill="none" stroke="var(--accent)" stroke-width="1.1" stroke-opacity=".55" stroke-linejoin="round"/>
+          <path d="M9.5,4.7 L22.5,4.7 L29,16 L22.5,27.3 L9.5,27.3 L3,16 Z" fill="none" stroke="var(--sidebar-ink)" stroke-width="1.2" stroke-linejoin="round" stroke-opacity=".9"/>
+          <circle cx="13" cy="10" r="1.6" fill="var(--sidebar-bg)" stroke="var(--sidebar-ink)" stroke-width="1.1"/>
+          <circle cx="17" cy="23" r="1.6" fill="var(--sidebar-bg)" stroke="var(--sidebar-ink)" stroke-width="1.1"/>
+        </svg>
+        <span class="brand-text">FaultLine</span>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="nav-label">Overview</span></button>
+      <button class="nav-item" data-tab="live"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5" opacity=".55"/><path d="M12 12 12 4"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg><span class="nav-label">Live Threat Feed</span></button>
+      <button class="nav-item" data-tab="cf"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4"/><path d="M3 8h13"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8"/></svg><span class="nav-label">Counterfactual</span></button>
+      <button class="nav-item" data-tab="graph"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M8.3 10.8 15.7 7.2M8.3 13.2 15.7 16.8"/></svg><span class="nav-label">Dependency Graph</span></button>
+      <button class="nav-item" data-tab="sim"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2.5 7L13 3l3 9h6"/></svg><span class="nav-label">Simulations</span></button>
+      <button class="nav-item" data-tab="opt"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h13"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="19" cy="18" r="2"/></svg><span class="nav-label">Optimization</span></button>
+      <button class="nav-item" data-tab="upload"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4 7 9M12 4l5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span class="nav-label">Upload Project</span></button>
+      <button class="nav-item" data-tab="reports"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h7M9 17h7"/></svg><span class="nav-label">Reports</span></button>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1 id="appTitle">frontend-app <span style="font-weight:400;color:var(--muted);font-size:14px;">+ 3 more services</span></h1>
+        <div class="sub">Portfolio scan &middot; analyzed just now &middot; 28 packages across 4 services</div>
+      </div>
+      <div class="topbar-right">
+        <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg><input id="searchBox" placeholder="Search dependencies..." /></div>
+        <button class="icon-btn" title="Toggle theme" id="themeToggle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg></button>
+        <button class="btn btn-primary" id="runSimBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg> Run Simulation</button>
+        <div class="avatar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-4 4.4-6 7.5-6s6.1 2 7.5 6"/></svg></div>
+      </div>
+    </div>
+
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<script id="faultline-data" type="application/json">{
+  "app": "frontend-app",
+  "root_apps": [
+    "frontend-app",
+    "checkout-service",
+    "admin-dashboard",
+    "mobile-api-gateway"
+  ],
+  "packages": {
+    "react": {
+      "dependents": 2,
+      "affected_count": 2,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app"
+      ],
+      "apps_affected_count": 2,
+      "criticality": 3,
+      "exposure": 7,
+      "propagation_depth": 1,
+      "pagerank": 0.03381,
+      "betweenness": 0.13369,
+      "is_direct": true,
+      "maintainers": 11,
+      "last_release_days": 18,
+      "downloads_m": 24.0,
+      "version": "18.3.1",
+      "license": "MIT",
+      "unknown_risk_score": 49.4,
+      "ripple_risk_score": 39.3
+    },
+    "axios": {
+      "dependents": 3,
+      "affected_count": 3,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 4,
+      "exposure": 8,
+      "propagation_depth": 1,
+      "pagerank": 0.04107,
+      "betweenness": 0.17563,
+      "is_direct": true,
+      "maintainers": 6,
+      "last_release_days": 40,
+      "downloads_m": 55.0,
+      "version": "1.7.7",
+      "license": "MIT",
+      "unknown_risk_score": 26.2,
+      "ripple_risk_score": 41.4
+    },
+    "express": {
+      "dependents": 3,
+      "affected_count": 3,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 4,
+      "exposure": 10,
+      "propagation_depth": 1,
+      "pagerank": 0.15999,
+      "betweenness": 0.69032,
+      "is_direct": true,
+      "maintainers": 9,
+      "last_release_days": 61,
+      "downloads_m": 33.0,
+      "version": "4.21.1",
+      "license": "MIT",
+      "unknown_risk_score": 32.6,
+      "ripple_risk_score": 45.1
+    },
+    "next": {
+      "dependents": 1,
+      "affected_count": 1,
+      "apps_affected": [
+        "frontend-app"
+      ],
+      "apps_affected_count": 1,
+      "criticality": 2,
+      "exposure": 9,
+      "propagation_depth": 1,
+      "pagerank": 0.04666,
+      "betweenness": 0.1871,
+      "is_direct": true,
+      "maintainers": 14,
+      "last_release_days": 5,
+      "downloads_m": 9.0,
+      "version": "14.2.15",
+      "license": "MIT",
+      "unknown_risk_score": 82.6,
+      "ripple_risk_score": 42.3
+    },
+    "lodash": {
+      "dependents": 3,
+      "affected_count": 3,
+      "apps_affected": [
+        "admin-dashboard",
+        "checkout-service",
+        "frontend-app"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 4,
+      "exposure": 10,
+      "propagation_depth": 1,
+      "pagerank": 0.01314,
+      "betweenness": 0.03692,
+      "is_direct": true,
+      "maintainers": 2,
+      "last_release_days": 610,
+      "downloads_m": 47.0,
+      "version": "4.17.20",
+      "license": "MIT",
+      "unknown_risk_score": 49.1,
+      "ripple_risk_score": 57.8
+    },
+    "loose-envify": {
+      "dependents": 3,
+      "affected_count": 3,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app"
+      ],
+      "apps_affected_count": 2,
+      "criticality": 4,
+      "exposure": 6,
+      "propagation_depth": 2,
+      "pagerank": 0.02432,
+      "betweenness": 0.06452,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 900,
+      "downloads_m": 30.0,
+      "version": "1.4.0",
+      "license": "MIT",
+      "unknown_risk_score": 55.3,
+      "ripple_risk_score": 45.1
+    },
+    "js-tokens": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app"
+      ],
+      "apps_affected_count": 2,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 3,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 2,
+      "last_release_days": 1100,
+      "downloads_m": 40.0,
+      "version": "4.0.0",
+      "license": "MIT",
+      "unknown_risk_score": 66.2,
+      "ripple_risk_score": 51.2
+    },
+    "follow-redirects": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": true,
+      "maintainers": 2,
+      "last_release_days": 30,
+      "downloads_m": 60.0,
+      "version": "1.15.6",
+      "license": "MIT",
+      "unknown_risk_score": 47.7,
+      "ripple_risk_score": 45.6
+    },
+    "form-data": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 200,
+      "downloads_m": 45.0,
+      "version": "4.0.0",
+      "license": "MIT",
+      "unknown_risk_score": 31.9,
+      "ripple_risk_score": 44.0
+    },
+    "proxy-from-env": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "admin-dashboard",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 1,
+      "last_release_days": 1400,
+      "downloads_m": 50.0,
+      "version": "1.1.0",
+      "license": "MIT",
+      "unknown_risk_score": 100.0,
+      "ripple_risk_score": 50.8
+    },
+    "body-parser": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 7,
+      "propagation_depth": 2,
+      "pagerank": 0.02845,
+      "betweenness": 0.00538,
+      "is_direct": false,
+      "maintainers": 5,
+      "last_release_days": 70,
+      "downloads_m": 20.0,
+      "version": "1.20.3",
+      "license": "MIT",
+      "unknown_risk_score": 0.0,
+      "ripple_risk_score": 43.8
+    },
+    "cookie": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": true,
+      "maintainers": 4,
+      "last_release_days": 45,
+      "downloads_m": 25.0,
+      "version": "0.6.0",
+      "license": "MIT",
+      "unknown_risk_score": 3.9,
+      "ripple_risk_score": 41.2
+    },
+    "debug": {
+      "dependents": 8,
+      "affected_count": 8,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 9,
+      "exposure": 6,
+      "propagation_depth": 2,
+      "pagerank": 0.02432,
+      "betweenness": 0.07384,
+      "is_direct": true,
+      "maintainers": 6,
+      "last_release_days": 300,
+      "downloads_m": 70.0,
+      "version": "4.3.7",
+      "license": "MIT",
+      "unknown_risk_score": 68.9,
+      "ripple_risk_score": 59.1
+    },
+    "ms": {
+      "dependents": 9,
+      "affected_count": 9,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 10,
+      "exposure": 5,
+      "propagation_depth": 3,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 2,
+      "last_release_days": 500,
+      "downloads_m": 65.0,
+      "version": "2.1.3",
+      "license": "MIT",
+      "unknown_risk_score": 63.4,
+      "ripple_risk_score": 63.2
+    },
+    "finalhandler": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 6,
+      "propagation_depth": 2,
+      "pagerank": 0.021,
+      "betweenness": 0.00143,
+      "is_direct": false,
+      "maintainers": 5,
+      "last_release_days": 70,
+      "downloads_m": 18.0,
+      "version": "1.3.1",
+      "license": "MIT",
+      "unknown_risk_score": 0.1,
+      "ripple_risk_score": 42.3
+    },
+    "merge-descriptors": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 800,
+      "downloads_m": 15.0,
+      "version": "1.0.3",
+      "license": "MIT",
+      "unknown_risk_score": 51.6,
+      "ripple_risk_score": 45.9
+    },
+    "qs": {
+      "dependents": 5,
+      "affected_count": 5,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 6,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 4,
+      "last_release_days": 90,
+      "downloads_m": 30.0,
+      "version": "6.13.0",
+      "license": "BSD-3-Clause",
+      "unknown_risk_score": 6.0,
+      "ripple_risk_score": 44.0
+    },
+    "send": {
+      "dependents": 5,
+      "affected_count": 5,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 6,
+      "exposure": 6,
+      "propagation_depth": 2,
+      "pagerank": 0.021,
+      "betweenness": 0.00466,
+      "is_direct": false,
+      "maintainers": 5,
+      "last_release_days": 70,
+      "downloads_m": 17.0,
+      "version": "0.19.0",
+      "license": "MIT",
+      "unknown_risk_score": 0.5,
+      "ripple_risk_score": 44.9
+    },
+    "serve-static": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 6,
+      "propagation_depth": 2,
+      "pagerank": 0.02207,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 5,
+      "last_release_days": 70,
+      "downloads_m": 16.0,
+      "version": "1.16.2",
+      "license": "MIT",
+      "unknown_risk_score": 0.9,
+      "ripple_risk_score": 42.4
+    },
+    "path-to-regexp": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 2,
+      "last_release_days": 15,
+      "downloads_m": 22.0,
+      "version": "0.1.10",
+      "license": "MIT",
+      "unknown_risk_score": 23.3,
+      "ripple_risk_score": 43.1
+    },
+    "encodeurl": {
+      "dependents": 7,
+      "affected_count": 7,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 8,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.00072,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 500,
+      "downloads_m": 20.0,
+      "version": "1.0.2",
+      "license": "MIT",
+      "unknown_risk_score": 30.1,
+      "ripple_risk_score": 51.3
+    },
+    "content-type": {
+      "dependents": 5,
+      "affected_count": 5,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 6,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 600,
+      "downloads_m": 21.0,
+      "version": "1.0.5",
+      "license": "MIT",
+      "unknown_risk_score": 36.3,
+      "ripple_risk_score": 47.0
+    },
+    "proxy-addr": {
+      "dependents": 4,
+      "affected_count": 4,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 5,
+      "exposure": 8,
+      "propagation_depth": 2,
+      "pagerank": 0.03549,
+      "betweenness": 0.12688,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 500,
+      "downloads_m": 19.0,
+      "version": "2.0.7",
+      "license": "MIT",
+      "unknown_risk_score": 30.9,
+      "ripple_risk_score": 48.4
+    },
+    "forwarded": {
+      "dependents": 5,
+      "affected_count": 5,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 6,
+      "exposure": 5,
+      "propagation_depth": 3,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 2,
+      "last_release_days": 700,
+      "downloads_m": 18.0,
+      "version": "0.2.0",
+      "license": "MIT",
+      "unknown_risk_score": 43.4,
+      "ripple_risk_score": 51.5
+    },
+    "ipaddr.js": {
+      "dependents": 5,
+      "affected_count": 5,
+      "apps_affected": [
+        "checkout-service",
+        "frontend-app",
+        "mobile-api-gateway"
+      ],
+      "apps_affected_count": 3,
+      "criticality": 6,
+      "exposure": 5,
+      "propagation_depth": 3,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 2,
+      "last_release_days": 400,
+      "downloads_m": 18.0,
+      "version": "2.2.0",
+      "license": "MIT",
+      "unknown_risk_score": 38.9,
+      "ripple_risk_score": 51.0
+    },
+    "styled-jsx": {
+      "dependents": 2,
+      "affected_count": 2,
+      "apps_affected": [
+        "frontend-app"
+      ],
+      "apps_affected_count": 1,
+      "criticality": 3,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 4,
+      "last_release_days": 10,
+      "downloads_m": 8.0,
+      "version": "5.1.6",
+      "license": "MIT",
+      "unknown_risk_score": 22.9,
+      "ripple_risk_score": 37.4
+    },
+    "@next/env": {
+      "dependents": 2,
+      "affected_count": 2,
+      "apps_affected": [
+        "frontend-app"
+      ],
+      "apps_affected_count": 1,
+      "criticality": 3,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 5,
+      "last_release_days": 5,
+      "downloads_m": 9.0,
+      "version": "14.2.15",
+      "license": "MIT",
+      "unknown_risk_score": 16.7,
+      "ripple_risk_score": 36.8
+    },
+    "postcss": {
+      "dependents": 2,
+      "affected_count": 2,
+      "apps_affected": [
+        "frontend-app"
+      ],
+      "apps_affected_count": 1,
+      "criticality": 3,
+      "exposure": 5,
+      "propagation_depth": 2,
+      "pagerank": 0.01314,
+      "betweenness": 0.0,
+      "is_direct": false,
+      "maintainers": 3,
+      "last_release_days": 60,
+      "downloads_m": 35.0,
+      "version": "8.4.47",
+      "license": "MIT",
+      "unknown_risk_score": 14.0,
+      "ripple_risk_score": 36.5
+    }
+  },
+  "edges": [
+    {
+      "source": "frontend-app",
+      "target": "react"
+    },
+    {
+      "source": "frontend-app",
+      "target": "axios"
+    },
+    {
+      "source": "frontend-app",
+      "target": "express"
+    },
+    {
+      "source": "frontend-app",
+      "target": "next"
+    },
+    {
+      "source": "frontend-app",
+      "target": "lodash"
+    },
+    {
+      "source": "react",
+      "target": "loose-envify"
+    },
+    {
+      "source": "axios",
+      "target": "follow-redirects"
+    },
+    {
+      "source": "axios",
+      "target": "form-data"
+    },
+    {
+      "source": "axios",
+      "target": "proxy-from-env"
+    },
+    {
+      "source": "express",
+      "target": "body-parser"
+    },
+    {
+      "source": "express",
+      "target": "cookie"
+    },
+    {
+      "source": "express",
+      "target": "debug"
+    },
+    {
+      "source": "express",
+      "target": "finalhandler"
+    },
+    {
+      "source": "express",
+      "target": "merge-descriptors"
+    },
+    {
+      "source": "express",
+      "target": "qs"
+    },
+    {
+      "source": "express",
+      "target": "send"
+    },
+    {
+      "source": "express",
+      "target": "serve-static"
+    },
+    {
+      "source": "express",
+      "target": "path-to-regexp"
+    },
+    {
+      "source": "express",
+      "target": "encodeurl"
+    },
+    {
+      "source": "express",
+      "target": "content-type"
+    },
+    {
+      "source": "express",
+      "target": "proxy-addr"
+    },
+    {
+      "source": "next",
+      "target": "styled-jsx"
+    },
+    {
+      "source": "next",
+      "target": "@next/env"
+    },
+    {
+      "source": "next",
+      "target": "postcss"
+    },
+    {
+      "source": "checkout-service",
+      "target": "express"
+    },
+    {
+      "source": "checkout-service",
+      "target": "lodash"
+    },
+    {
+      "source": "checkout-service",
+      "target": "cookie"
+    },
+    {
+      "source": "checkout-service",
+      "target": "debug"
+    },
+    {
+      "source": "debug",
+      "target": "ms"
+    },
+    {
+      "source": "admin-dashboard",
+      "target": "react"
+    },
+    {
+      "source": "admin-dashboard",
+      "target": "axios"
+    },
+    {
+      "source": "admin-dashboard",
+      "target": "lodash"
+    },
+    {
+      "source": "mobile-api-gateway",
+      "target": "express"
+    },
+    {
+      "source": "mobile-api-gateway",
+      "target": "axios"
+    },
+    {
+      "source": "mobile-api-gateway",
+      "target": "follow-redirects"
+    },
+    {
+      "source": "loose-envify",
+      "target": "js-tokens"
+    },
+    {
+      "source": "body-parser",
+      "target": "debug"
+    },
+    {
+      "source": "body-parser",
+      "target": "qs"
+    },
+    {
+      "source": "body-parser",
+      "target": "content-type"
+    },
+    {
+      "source": "finalhandler",
+      "target": "debug"
+    },
+    {
+      "source": "finalhandler",
+      "target": "encodeurl"
+    },
+    {
+      "source": "send",
+      "target": "debug"
+    },
+    {
+      "source": "send",
+      "target": "encodeurl"
+    },
+    {
+      "source": "serve-static",
+      "target": "send"
+    },
+    {
+      "source": "proxy-addr",
+      "target": "forwarded"
+    },
+    {
+      "source": "proxy-addr",
+      "target": "ipaddr.js"
+    }
+  ],
+  "total_risk_score": 46.2,
+  "advisory": {
+    "id": "GHSA-35jh-r3h4-6jhm",
+    "cve": "CVE-2021-23337",
+    "summary": "Command Injection via the template function",
+    "severity": "High",
+    "cvss": 7.2,
+    "fixed_version": "4.17.21"
+  },
+  "incidents": [
+    {
+      "name": "event-stream",
+      "date": "2018-11",
+      "description": "A maintainer handed off publish rights to an unknown contributor, who added a malicious flatmap-stream dependency targeting the Copay bitcoin wallet.",
+      "pattern": [
+        "maintainer handoff",
+        "new transitive dependency added with no source history",
+        "targeted payload"
+      ]
+    },
+    {
+      "name": "ua-parser-js",
+      "date": "2021-10",
+      "description": "The maintainer's npm account was compromised; three malicious versions were published that installed a cryptominer and a password stealer.",
+      "pattern": [
+        "account compromise",
+        "sudden unscheduled release",
+        "install-script payload"
+      ]
+    },
+    {
+      "name": "xz-utils",
+      "date": "2024-03",
+      "description": "CVE-2024-3094 -- a multi-year social-engineering campaign inserted a backdoor into liblzma that would have compromised OpenSSH on major Linux distributions.",
+      "pattern": [
+        "long-term contributor trust-building",
+        "obfuscated build-script payload",
+        "targeted high-centrality package"
+      ]
+    }
+  ],
+  "methodology_note": "Dependency edges, package versions, and licenses reflect these packages' real, publicly documented releases and dependency trees. The lodash command-injection record is a real CVE (GHSA-35jh-r3h4-6jhm / CVE-2021-23337, CVSS 7.2), fetched from OSV.dev. Maintainer counts, release cadence, and download volumes are illustrative order-of-magnitude estimates (live registry access was not reachable from this build environment), not a live scrape. Graph metrics (PageRank, betweenness, propagation depth) are computed for real from the edges above via NetworkX. The unknown-risk signal comes from a real scikit-learn IsolationForest trained on these packages' feature vectors plus reference points shaped like the documented feature signatures of event-stream, ua-parser-js, and xz-utils."
+}</script>
+<script>
+/* ===================== FaultLine app logic ===================== */
+const DATA = JSON.parse(document.getElementById('faultline-data').textContent);
+const ROOTS = DATA.root_apps;
+const PKG = DATA.packages;
+const EDGES = DATA.edges; // {source,target} source depends on target
+
+/* ---------- graph adjacency ---------- */
+const FWD = {};   // FWD[x] = [things x depends on]
+const REV = {};   // REV[x] = [things that depend on x]
+[...ROOTS, ...Object.keys(PKG)].forEach(n => { FWD[n] = []; REV[n] = []; });
+EDGES.forEach(e => { FWD[e.source] = FWD[e.source] || []; FWD[e.source].push(e.target);
+                     REV[e.target] = REV[e.target] || []; REV[e.target].push(e.source); });
+
+const ALL_NODES = [...ROOTS, ...Object.keys(PKG)];
+
+/* ---------- risk helpers ---------- */
+function bucket(score){ if(score>=57) return 'crit'; if(score>=45) return 'high'; if(score>=40) return 'med'; return 'low'; }
+function bucketLabel(b){ return {crit:'Critical', high:'High', med:'Medium', low:'Low'}[b]; }
+function bucketVar(b){ return {crit:'--crit', high:'--high', med:'--med', low:'--low'}[b]; }
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function scoreOf(name){ return PKG[name] ? PKG[name].ripple_risk_score : 0; }
+function isRoot(name){ return ROOTS.includes(name); }
+
+/* the featured critical dependency for this demo scenario */
+const FEATURED = 'lodash';
+
+/* ---------- icon set (inline SVG, stroke style) ---------- */
+function icon(name, size=16){
+  const s = size;
+  const paths = {
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    share: '<circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M8.3 10.8 15.7 7.2M8.3 13.2 15.7 16.8"/>',
+    activity: '<path d="M2 12h4l2.5 7L13 3l3 9h6"/>',
+    sliders: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h13M21 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="19" cy="18" r="2"/>',
+    file: '<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h7M9 17h7"/>',
+    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.3-4.3"/>',
+    moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
+    play: '<path d="M6 4l14 8-14 8z"/>',
+    shield: '<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>',
+    boxes: '<path d="M12 2 4 6.5v11L12 22l8-4.5v-11z"/><path d="M4 6.5 12 11l8-4.5M12 11v11"/>',
+    alert: '<path d="M12 3 2 21h20z"/><path d="M12 10v5"/><circle cx="12" cy="18" r="0.8" fill="currentColor" stroke="none"/>',
+    apps: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><path d="M17 13v8M13 17h8" opacity=".55"/>',
+    fingerprint: '<path d="M12 3a7 7 0 0 0-7 7v2c0 3 1 6 3 8"/><path d="M12 3a7 7 0 0 1 7 7v3c0 1.2-.1 2.2-.3 3"/><path d="M8 20c-1.5-2-2-4.5-2-7v-3a6 6 0 0 1 12 0v2"/><path d="M12 9a4 4 0 0 0-4 4v1c0 2.5.8 4.7 2 6.3"/><path d="M12 9a4 4 0 0 1 4 4v2c0 1 0 2-.3 3"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/>',
+    trend: '<path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    swap: '<path d="M7 4 3 8l4 4"/><path d="M3 8h13"/><path d="M17 20l4-4-4-4"/><path d="M21 16H8"/>',
+    isolate: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+    check: '<path d="M4 12l5 5L20 6"/>',
+    scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 8.5 20 20M20 4 8.5 15.5"/>',
+    cube: '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>',
+    dot: '<circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/>',
+    close: '<path d="M6 6l12 12M18 6 6 18"/>',
+    chevron: '<path d="M6 9l6 6 6-6"/>',
+    radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5" opacity=".55"/><path d="M12 12 12 4"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+    upload: '<path d="M12 16V4M12 4 7 9M12 4l5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  };
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]||''}</svg>`;
+}
+
+/* ---------- state ---------- */
+const state = {
+  tab: 'overview',
+  selected: FEATURED,
+  simMode: 'single',
+  simSeeds: [FEATURED],
+  simPlaying: false,
+  simLevel: -1,
+  simResult: null,
+  optApplied: [],      // applied optimizer interventions (ids)
+  filter: '',
+  riskFilter: new Set(['crit','high','med','low']), // active risk tiers shown in graphs
+  optSort: { key: 'ratio', dir: 'desc' },
+  misTarget: 0.4,
+  optScenario: FEATURED, // which package's compromise the Optimization tab is currently solving for
+  cfType: 'remove',   // which counterfactual scenario is expanded on the Overview
+  cfTargets: {        // per-scenario "what if" target, changeable via the picker
+    add: 'frontend-app',
+    remove: FEATURED,
+    replace: FEATURED,
+    isolate: 'checkout-service',
+  },
+  live: {             // real-time OSV.dev lookup against the actual pinned package versions
+    status: 'idle',   // idle | checking | done | error
+    lastChecked: null,
+    findings: {},     // pkgId -> [{id, cve, summary, published}]
+    error: null,
+  },
+  collapsed: new Set(), // ids of Overview cards currently collapsed
+  upload: {           // "Upload Project" tab -- scan a visitor's own manifest against OSV.dev
+    status: 'idle',   // idle | reading | checking | done | error
+    fileName: null,
+    packages: [],     // [{name, version}] parsed straight from the uploaded manifest
+    source: null,     // 'lock' | 'manifest' -- which kind of file was parsed
+    findings: {},     // name -> [{id, cve, summary, published, fixedVersion}]
+    error: null,
+  },
+};
+
+/* ---------- collapsible cards (Overview tab) ---------- */
+function toggleCollapse(id){
+  if(state.collapsed.has(id)) state.collapsed.delete(id); else state.collapsed.add(id);
+  render();
+}
+function collapseBtnHTML(id){
+  const collapsed = state.collapsed.has(id);
+  return `<button class="collapse-btn" data-collapse="${id}" aria-expanded="${collapsed?'false':'true'}" title="${collapsed?'Expand':'Collapse'}">${icon('chevron',14)}</button>`;
+}
+function bodyClass(id){ return state.collapsed.has(id) ? 'collapsible-body is-collapsed' : 'collapsible-body'; }
+function wireCollapsers(el){
+  el.querySelectorAll('.collapse-btn').forEach(b => b.onclick = (e) => { e.stopPropagation(); toggleCollapse(b.dataset.collapse); });
+}
+
+/* Keep "the package I'm looking at" and "the scenario I'm optimizing for" in sync
+   wherever the user selects a node, so Optimization reflects real context instead
+   of a fixed global answer. */
+function selectPkg(id){
+  state.selected = id;
+  if(PKG[id]) state.optScenario = id;
+}
+
+/* ---------- mutable-graph helpers for simulation / counterfactual ---------- */
+function cloneAdj(){ return { FWD: JSON.parse(JSON.stringify(FWD)), REV: JSON.parse(JSON.stringify(REV)) }; }
+
+function applyMutation(adj, m){
+  const { FWD, REV } = adj;
+  if(m.type === 'remove'){
+    (FWD[m.target]||[]).forEach(d => { REV[d] = (REV[d]||[]).filter(x=>x!==m.target); });
+    (REV[m.target]||[]).forEach(u => { FWD[u] = (FWD[u]||[]).filter(x=>x!==m.target); });
+    FWD[m.target] = []; REV[m.target] = [];
+  } else if(m.type === 'isolate'){
+    // cut edges from a root service to its direct deps
+    (FWD[m.target]||[]).forEach(d => { REV[d] = (REV[d]||[]).filter(x=>x!==m.target); });
+    FWD[m.target] = [];
+  } else if(m.type === 'replace'){
+    // target's dependents now point to m.payload instead
+    const deps = REV[m.target]||[];
+    deps.forEach(u => { FWD[u] = (FWD[u]||[]).map(x=> x===m.target? m.payload : x); });
+    REV[m.payload] = (REV[m.payload]||[]).concat(deps);
+    REV[m.target] = [];
+  } else if(m.type === 'patch'){
+    // structural graph unchanged; risk override handled in scoring
+  } else if(m.type === 'add'){
+    FWD[m.root] = (FWD[m.root]||[]).concat(m.payload);
+    REV[m.payload] = (REV[m.payload]||[]).concat([m.root]);
+  }
+  return adj;
+}
+
+function effectiveScore(name, overrides){
+  if(overrides && overrides[name] !== undefined) return overrides[name];
+  return scoreOf(name);
+}
+
+/* Aggregate "total risk" recomputed live over a (possibly mutated) graph.
+   Same spirit as the python pipeline's weighted composite: nodes still
+   reachable from a root contribute their (possibly overridden) ripple score,
+   weighted by how many roots they still reach. Calibrated so the baseline
+   (unmutated, no overrides) reproduces DATA.total_risk_score exactly. */
+let CALIBRATION = 1;
+const CORE_CRITICAL = Object.keys(PKG).filter(n => bucket(scoreOf(n))==='crit'); // ['ms','debug','lodash']
+function bfsRootsReached(adj, start){
+  const seen = new Set([start]); const q=[start]; const foundRoots=new Set();
+  while(q.length){ const cur=q.shift(); (adj.REV[cur]||[]).forEach(p=>{
+      if(ROOTS.includes(p)) foundRoots.add(p);
+      else if(!seen.has(p)){ seen.add(p); q.push(p); }
+    });}
+  return foundRoots.size;
+}
+/* Fixed baseline denominator for the portfolio term, taken from the
+   unmutated graph. Re-normalizing by the CURRENT (shrinking) weight total
+   on every mutation let removing a low-risk package's reach ENTIRELY drop
+   it out of the average and thereby raise the average of what's left --
+   so an isolate/remove action could paradoxically look like it increased
+   risk. Dividing by a fixed baseline instead makes the portfolio term
+   provably non-increasing as edges are cut: every item's weight can only
+   shrink or drop to zero, and the denominator never does. */
+const PORTFOLIO_WSUM0 = (function(){
+  let sum = 0;
+  Object.keys(PKG).forEach(n => {
+    const reachingRoots = (REV[n]||[]).length ? bfsRootsReached({FWD,REV}, n) : 0;
+    if(reachingRoots > 0) sum += reachingRoots / ROOTS.length;
+  });
+  return sum || 1;
+})();
+function rawAggregate(adj, overrides){
+  const REV = adj.REV;
+  // Total exposure is driven mostly by the worst offenders currently on the
+  // board (the flagged critical-bucket packages), same as any real posture
+  // score -- with a smaller portfolio-wide term for texture. A critical node
+  // that's been patched (score override) or fully cut off from every root
+  // (isolated/removed) stops driving the number either way.
+  const coreScores = CORE_CRITICAL.map(n => {
+    const reaches = bfsRootsReached(adj, n);
+    return reaches > 0 ? effectiveScore(n, overrides) : 18; // fully contained -> low residual
+  });
+  const coreAvg = coreScores.reduce((a,b)=>a+b,0) / coreScores.length;
+
+  const items = [];
+  Object.keys(PKG).forEach(n => {
+    const reachingRoots = (REV[n]||[]).length ? bfsRootsReached(adj, n) : 0;
+    if(reachingRoots > 0) items.push({ n, score: effectiveScore(n, overrides), w: reachingRoots / ROOTS.length });
+  });
+  const portfolioAvg = items.reduce((s,i)=>s+i.score*i.w,0) / PORTFOLIO_WSUM0;
+
+  return 0.65*coreAvg + 0.35*portfolioAvg;
+}
+(function calibrate(){
+  const base = cloneAdj();
+  const raw = rawAggregate(base, {});
+  CALIBRATION = raw ? DATA.total_risk_score / raw : 1;
+})();
+function totalRisk(adj, overrides){
+  return Math.max(0, Math.min(100, rawAggregate(adj, overrides) * CALIBRATION));
+}
+
+/* ---------- blast radius (BFS over REV = who depends on the seed) ---------- */
+function blastRadius(seeds, adj){
+  adj = adj || {FWD, REV};
+  const levels = {}; const q = [];
+  seeds.forEach(s => { levels[s] = 0; q.push(s); });
+  let i = 0;
+  while(i < q.length){
+    const cur = q[i++]; const lvl = levels[cur];
+    (adj.REV[cur]||[]).forEach(p => { if(!(p in levels)){ levels[p] = lvl+1; q.push(p); } });
+  }
+  const affected = Object.keys(levels).filter(n => !seeds.includes(n));
+  const appsAffected = affected.filter(isRoot);
+  const pkgsAffected = affected.filter(n => !isRoot(n));
+  const maxDepth = Math.max(0, ...Object.values(levels));
+  return { levels, affected, appsAffected, pkgsAffected, maxDepth };
+}
+
+/* Forward closure: every package a service (or package) pulls in, direct and
+   transitive -- the reverse direction of blastRadius (which asks "who
+   depends on me"), this asks "what do I depend on". Used for the Dependency
+   Graph tab's per-service detail panel. */
+function depsClosure(root){
+  const seen = new Set();
+  const q = [...(FWD[root]||[])];
+  q.forEach(x => seen.add(x));
+  let i = 0;
+  while(i < q.length){
+    const cur = q[i++];
+    (FWD[cur]||[]).forEach(n => { if(!seen.has(n)){ seen.add(n); q.push(n); } });
+  }
+  return [...seen];
+}
+
+/* Rank packages by how much damage compromising them alone would cause --
+   the "if I were an attacker, what's my highest-leverage target" view. */
+function rankByBlastRadius(n){
+  const ranked = Object.keys(PKG).map(id => ({ n:id, r: blastRadius([id]) }))
+    .sort((a,b) => (b.r.appsAffected.length + b.r.pkgsAffected.length*0.1) - (a.r.appsAffected.length + a.r.pkgsAffected.length*0.1));
+  return n ? ranked.slice(0, n) : ranked;
+}
+
+/* The single best immediate defensive move against a compromise of `target`:
+   the candidate action that shrinks the STRUCTURAL blast radius (apps/packages
+   actually still reachable) the most, not just the one with the best generic
+   risk-reduction ratio. A pure version patch/pin never removes an edge from
+   the dependency graph -- it neutralizes the vulnerability, but anything that
+   already depends on the package still depends on it -- so ranking by risk
+   score alone (as the Optimization tab does) can recommend an action that
+   leaves "apps affected" completely unchanged, which reads as broken here.
+   Falls back to the best risk-score action when no candidate changes reachability
+   at all (e.g. the package isn't on the path to any modeled service). */
+
+/* The package's OWN Ripple Risk Score (0-100, same scale as everywhere else
+   in the app) after a specific action is applied to it -- a patch or replace
+   directly changes that package's own score; an isolate action doesn't touch
+   the vulnerability itself, only who can still reach it, so the score is
+   correctly reported unchanged. Used instead of a portfolio-wide "% risk
+   reduced" figure, which stays nearly identical across structurally similar
+   packages and reads as arbitrary -- an absolute, per-package score out of
+   100 actually differs by attack, the way every other score in this app does. */
+function targetScoreAfter(target, action){
+  if(!action) return scoreOf(target);
+  if(action.type === 'patch' && action.target === target) return action.overrideScore;
+  if(action.type === 'replace' && action.target === target) return action.overridePayloadScore;
+  return scoreOf(target);
+}
+function bestContainmentFor(target){
+  const pool = candidateActionsFor(target);
+  if(!pool.length) return null;
+  const before = blastRadius([target]);
+  const baseRisk = totalRisk(cloneAdj(), {});
+  const scored = pool.map(a => {
+    const {adj, overrides} = evaluateAction(a, cloneAdj(), {});
+    const after = blastRadius([target], adj);
+    const riskAfter = totalRisk(adj, overrides);
+    const reduction = Math.max(0, (baseRisk-riskAfter)/baseRisk*100);
+    const containment = (before.appsAffected.length-after.appsAffected.length)*10 + (before.pkgsAffected.length-after.pkgsAffected.length);
+    return Object.assign({}, a, { reduction, containment, after, adj, overrides });
+  }).sort((x,y) => y.containment - x.containment || y.reduction - x.reduction);
+  return { before, best: scored[0] };
+}
+
+/* The combined defense plan for a COORDINATED, multi-package compromise:
+   greedily add whichever candidate action (drawn from the union of every
+   compromised package's own candidate actions) shrinks the *combined* blast
+   radius the most, repeating against the already-contained graph, until no
+   remaining action helps. This is the multi-attack analogue of
+   bestContainmentFor -- same containment-first scoring, just evaluated
+   against blastRadius(seeds) instead of a single seed, and it can chain
+   more than one action since a coordinated attack usually needs more than
+   one firebreak. */
+function bestContainmentForMulti(seeds){
+  if(!seeds || !seeds.length) return null;
+  const before = blastRadius(seeds);
+  const seen = new Set();
+  let pool = [];
+  seeds.forEach(s => candidateActionsFor(s).forEach(a => { if(!seen.has(a.id)){ seen.add(a.id); pool.push(a); } }));
+  if(!pool.length) return null;
+
+  const baseRisk = totalRisk(cloneAdj(), {});
+  let adj = cloneAdj(), overrides = {};
+  let current = before;
+  const chosen = [];
+  while(pool.length){
+    let bestIdx = -1, bestAfter = null, bestScore = 0, bestEval = null;
+    pool.forEach((a, i) => {
+      const r = evaluateAction(a, adj, overrides);
+      const after = blastRadius(seeds, r.adj);
+      const containment = (current.appsAffected.length-after.appsAffected.length)*10 + (current.pkgsAffected.length-after.pkgsAffected.length);
+      if(containment > bestScore){ bestScore = containment; bestIdx = i; bestAfter = after; bestEval = r; }
+    });
+    if(bestIdx === -1) break; // nothing left meaningfully shrinks the combined blast radius
+    chosen.push(pool[bestIdx]);
+    adj = bestEval.adj; overrides = bestEval.overrides; current = bestAfter;
+    pool.splice(bestIdx, 1);
+  }
+  const riskAfter = totalRisk(adj, overrides);
+  const reduction = Math.max(0, (baseRisk-riskAfter)/baseRisk*100);
+  return { before, after: current, chosen, reduction, adj, overrides };
+}
+
+/* ---------- format helpers ---------- */
+function fmt1(n){ return (Math.round(n*10)/10).toFixed(1); }
+function pct(n){ return Math.round(n) + '%'; }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function matchesFilter(id){ return !state.filter || id.toLowerCase().includes(state.filter); }
+
+/* ===================== Dependency-free force graph ===================== */
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVGNS, tag);
+  if(attrs) Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+  return el;
+}
+function radiusOf(id){
+  if(isRoot(id)) return 22;
+  const p = PKG[id]; if(!p) return 8;
+  return 7 + Math.min(10, p.dependents*1.1);
+}
+function colorFor(id){
+  const p = PKG[id]; if(!p) return cssVar('--muted');
+  return cssVar(bucketVar(bucket(p.ripple_risk_score)));
+}
+/* Nodes currently visible given the active risk-tier legend + live search box.
+   Root services are always shown for orientation. */
+function computeDim(nodeIds){
+  const active = new Set();
+  nodeIds.forEach(id => {
+    if(isRoot(id)){ if(matchesFilter(id) || !state.filter) active.add(id); return; }
+    const p = PKG[id];
+    const bucketOk = p ? state.riskFilter.has(bucket(p.ripple_risk_score)) : true;
+    if(bucketOk && matchesFilter(id)) active.add(id);
+  });
+  return active;
+}
+const LAYOUT_CACHE = {};
+function computeLayout(nodeIds, links, width, height){
+  const key = nodeIds.slice().sort().join(',') + '|' + width + 'x' + height;
+  if(LAYOUT_CACHE[key]) return LAYOUT_CACHE[key];
+  const pos = {};
+  const cx = width/2, cy = height/2;
+  // Seed roots on an inner ring and packages on an outer ring, ordered by
+  // dependent-count so heavier-hitting packages start further apart from
+  // each other -- gives the relaxation a much better starting point than a
+  // single shared ring, so it converges to a spread-out layout instead of
+  // a dense center-weighted hairball.
+  const rootIds = nodeIds.filter(isRoot);
+  const pkgIds = nodeIds.filter(id=>!isRoot(id)).sort((a,b)=> (PKG[b]?PKG[b].dependents:0) - (PKG[a]?PKG[a].dependents:0));
+  rootIds.forEach((id,i) => {
+    const a = (i / Math.max(1,rootIds.length)) * Math.PI * 2;
+    const r = Math.min(width,height)*0.16;
+    pos[id] = { x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r };
+  });
+  pkgIds.forEach((id,i) => {
+    const a = (i / Math.max(1,pkgIds.length)) * Math.PI * 2 + 0.4;
+    const r = Math.min(width,height)*0.4;
+    pos[id] = { x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r };
+  });
+  const rad = {}; nodeIds.forEach(id => rad[id] = radiusOf(id));
+  const idset = new Set(nodeIds);
+  const L = links.filter(l => idset.has(l.source) && idset.has(l.target));
+  for(let iter=0; iter<320; iter++){
+    // repulsion + hard collision separation (nodes never overlap once settled)
+    for(let i=0;i<nodeIds.length;i++){
+      for(let j=i+1;j<nodeIds.length;j++){
+        const a=nodeIds[i], b=nodeIds[j];
+        let dx = pos[a].x-pos[b].x, dy = pos[a].y-pos[b].y;
+        let d2 = dx*dx+dy*dy; if(d2<1) d2=1;
+        const d = Math.sqrt(d2);
+        const strength = (isRoot(a)||isRoot(b)) ? 6200 : 1700;
+        const f = strength / d2;
+        const fx = (dx/d)*f, fy=(dy/d)*f;
+        pos[a].x += fx; pos[a].y += fy; pos[b].x -= fx; pos[b].y -= fy;
+        const minD = rad[a]+rad[b]+14;
+        if(d < minD){
+          const push = (minD-d)/2;
+          const ux = dx/d, uy = dy/d;
+          pos[a].x += ux*push; pos[a].y += uy*push;
+          pos[b].x -= ux*push; pos[b].y -= uy*push;
+        }
+      }
+    }
+    // springs along links
+    L.forEach(l => {
+      const a = pos[l.source], b = pos[l.target];
+      const rest = (isRoot(l.source)||isRoot(l.target)) ? 105 : 62;
+      let dx=b.x-a.x, dy=b.y-a.y; let d=Math.sqrt(dx*dx+dy*dy)||1;
+      const f = (d-rest) * 0.06;
+      const fx=(dx/d)*f, fy=(dy/d)*f;
+      a.x+=fx; a.y+=fy; b.x-=fx; b.y-=fy;
+    });
+    // centering
+    nodeIds.forEach(id => { pos[id].x += (cx-pos[id].x)*0.006; pos[id].y += (cy-pos[id].y)*0.006; });
+  }
+  // clamp to bounds with margin
+  const margin = 40;
+  nodeIds.forEach(id => {
+    pos[id].x = Math.max(margin, Math.min(width-margin, pos[id].x));
+    pos[id].y = Math.max(margin, Math.min(height-margin, pos[id].y));
+  });
+  LAYOUT_CACHE[key] = pos;
+  return pos;
+}
+
+function drawGraph(container, opts){
+  opts = opts || {};
+  const svg = (typeof container === 'string') ? document.getElementById(container) : container;
+  const width = svg.clientWidth || 600, height = svg.clientHeight || 400;
+  svg.innerHTML = '';
+
+  const nodeIds = opts.nodes || ALL_NODES;
+  const links = EDGES;
+  const pos = computeLayout(nodeIds, links, width, height);
+  const idset = new Set(nodeIds);
+  const L = links.filter(l => idset.has(l.source) && idset.has(l.target));
+
+  // Fit the viewBox to the actual bounding box of the laid-out nodes (plus
+  // room above each for its label) instead of the raw container size, so
+  // the graph fills the panel edge-to-edge no matter how the force layout
+  // happens to cluster -- rather than a small knot of nodes adrift in a
+  // mostly-empty canvas. Recomputed from LIVE positions (not just the
+  // layout's initial output) so "Fit to screen" also does the right thing
+  // after a node has been dragged somewhere the original fit didn't cover.
+  function fitViewBox(){
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    nodeIds.forEach(id => {
+      const r = radiusOf(id);
+      const topPad = (isRoot(id) || r>12) ? 24 : 8;
+      minX = Math.min(minX, pos[id].x-r); maxX = Math.max(maxX, pos[id].x+r);
+      minY = Math.min(minY, pos[id].y-r-topPad); maxY = Math.max(maxY, pos[id].y+r);
+    });
+    const padX=24, padY=20;
+    minX-=padX; maxX+=padX; minY-=padY; maxY+=padY;
+    const bw = Math.max(1, maxX-minX), bh = Math.max(1, maxY-minY);
+    const fitScale = Math.min(width/bw, height/bh);
+    const vbW = width/fitScale, vbH = height/fitScale;
+    const bcx = (minX+maxX)/2, bcy = (minY+maxY)/2;
+    const vbX = bcx - vbW/2, vbY = bcy - vbH/2;
+    svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+  }
+  fitViewBox();
+
+  const zoomG = svgEl('g', { id: 'zoomG' });
+  svg.appendChild(zoomG);
+  const linkG = svgEl('g'); zoomG.appendChild(linkG);
+  const nodeGWrap = svgEl('g'); zoomG.appendChild(nodeGWrap);
+  // Labels live in their own top layer, drawn last, so a node's name is
+  // never painted over by a neighboring node's circle or pulse ring --
+  // the layered z-order (links -> nodes -> labels) instead of interleaving
+  // each node's own label into its own group is what keeps dense clusters legible.
+  const labelG = svgEl('g', { style:'pointer-events:none' }); zoomG.appendChild(labelG);
+
+  const highlight = opts.highlight;
+  const hotColor = cssVar(opts.highlightColor || '--crit');
+  const lineEls = {};
+  L.forEach(l => {
+    const hot = highlight && highlight.has(l.source) && highlight.has(l.target);
+    const line = svgEl('line', {
+      x1: pos[l.source].x, y1: pos[l.source].y, x2: pos[l.target].x, y2: pos[l.target].y,
+      stroke: hot ? hotColor : cssVar('--line'),
+      'stroke-width': hot ? 2 : 1.2, 'stroke-opacity': 0.8,
+    });
+    linkG.appendChild(line);
+    (lineEls[l.source] = lineEls[l.source]||[]).push({el:line, other:l.target, end:'2'});
+    (lineEls[l.target] = lineEls[l.target]||[]).push({el:line, other:l.source, end:'1'});
+  });
+
+  nodeIds.forEach(id => {
+    const root = isRoot(id);
+    const g = svgEl('g', { transform: `translate(${pos[id].x},${pos[id].y})`, style: 'cursor:pointer' });
+    const r = radiusOf(id);
+    const dim = opts.dim && !opts.dim.has(id);
+
+    if(!root && bucket(scoreOf(id))==='crit'){
+      g.appendChild(svgEl('circle', { class:'pulse', r: r+3, fill:'none', stroke: cssVar('--crit'), 'stroke-width':2 }));
+    }
+    const hotNode = highlight && highlight.has(id);
+    const circle = svgEl('circle', {
+      r, fill: root ? cssVar('--accent') : colorFor(id),
+      stroke: hotNode ? hotColor : (id===state.selected ? cssVar('--ink') : 'none'),
+      'stroke-width': hotNode ? 3 : (id===state.selected?2:0),
+      opacity: dim ? 0.16 : 1,
+    });
+    g.appendChild(circle);
+    if(root){
+      const t = svgEl('text', { 'text-anchor':'middle', dy:'.32em', fill:'#fff', 'font-size':12, style:'pointer-events:none' });
+      t.textContent = '⌘'; g.appendChild(t);
+    }
+    const title = svgEl('title'); title.textContent = root ? id : `${id}@${PKG[id].version}  ·  risk ${fmt1(scoreOf(id))}/100`; g.appendChild(title);
+
+    const showLabel = root || r > 12;
+    let labelEl = null;
+    if(showLabel){
+      labelEl = svgEl('text', {
+        'text-anchor':'middle', x: pos[id].x, y: pos[id].y-(r+6),
+        'font-size': root?11:9.5, 'font-weight': root?700:500, fill: cssVar('--ink-2'),
+        stroke: cssVar('--bg'), 'stroke-width': 3, 'paint-order': 'stroke fill',
+        opacity: dim?0.35:1,
+      });
+      labelEl.textContent = root ? id.replace('-service','').replace('-app','').replace('-gateway','').replace('-dashboard','') : id;
+      labelG.appendChild(labelEl);
+    }
+
+    g.addEventListener('click', () => { if(opts.onClick) opts.onClick(id); });
+
+    let dragging = false, moved = false;
+    g.addEventListener('pointerdown', (ev) => { dragging = true; moved = false; g.setPointerCapture(ev.pointerId); });
+    g.addEventListener('pointermove', (ev) => {
+      if(!dragging) return; moved = true;
+      const pt = toSvgPoint(svg, zoomG, ev.clientX, ev.clientY);
+      pos[id].x = pt.x; pos[id].y = pt.y;
+      g.setAttribute('transform', `translate(${pt.x},${pt.y})`);
+      if(labelEl){ labelEl.setAttribute('x', pt.x); labelEl.setAttribute('y', pt.y-(r+6)); }
+      (lineEls[id]||[]).forEach(({el,other,end}) => {
+        el.setAttribute(end==='1'?'x1':'x2', pt.x); el.setAttribute(end==='1'?'y1':'y2', pt.y);
+      });
+    });
+    g.addEventListener('pointerup', () => { dragging = false; });
+    nodeGWrap.appendChild(g);
+  });
+
+  // simple pan + wheel zoom
+  let scale=1, tx=0, ty=0, panning=false, lastX=0, lastY=0;
+  function applyTransform(){ zoomG.setAttribute('transform', `translate(${tx},${ty}) scale(${scale})`); }
+  svg.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    const delta = ev.deltaY > 0 ? 0.9 : 1.1;
+    scale = Math.max(0.4, Math.min(3, scale*delta));
+    applyTransform();
+  }, { passive:false });
+  svg.addEventListener('pointerdown', (ev) => { if(ev.target===svg){ panning=true; lastX=ev.clientX; lastY=ev.clientY; } });
+  svg.addEventListener('pointermove', (ev) => { if(panning){ tx += ev.clientX-lastX; ty += ev.clientY-lastY; lastX=ev.clientX; lastY=ev.clientY; applyTransform(); } });
+  window.addEventListener('pointerup', () => panning=false);
+  svg._resetView = () => { fitViewBox(); scale=1; tx=0; ty=0; applyTransform(); };
+  svg._zoomBy = (f) => { scale = Math.max(0.4, Math.min(3, scale*f)); applyTransform(); };
+}
+function toSvgPoint(svg, zoomG, clientX, clientY){
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const scaleX = vb.width/rect.width, scaleY = vb.height/rect.height;
+  const t = zoomG.getAttribute('transform')||'';
+  const m = /translate\(([-.\d]+),([-.\d]+)\) scale\(([.\d]+)\)/.exec(t);
+  const tx = m?parseFloat(m[1]):0, ty=m?parseFloat(m[2]):0, sc=m?parseFloat(m[3]):1;
+  const rawX = vb.x + (clientX-rect.left)*scaleX, rawY = vb.y + (clientY-rect.top)*scaleY;
+  return { x: (rawX-tx)/sc, y: (rawY-ty)/sc };
+}
+
+/* ---------- shared graph chrome: clickable legend + zoom controls ---------- */
+function legendHTML(showService){
+  const rows = ['crit','high','med','low'].map(b =>
+    `<div class="legend-row ${state.riskFilter.has(b)?'':'off'}" data-bucket="${b}"><span class="legend-dot" style="background:var(--${b})"></span>${bucketLabel(b)}</div>`
+  ).join('');
+  const service = showService ? `<div class="legend-row" style="cursor:default;"><span class="legend-dot" style="background:var(--accent)"></span>Service</div>` : '';
+  return `<div class="legend">${rows}${service}</div>`;
+}
+function zoomCtlHTML(prefix){
+  return `<div class="zoom-ctl">
+    <button class="zoom-btn" id="${prefix}-zin" title="Zoom in">+</button>
+    <button class="zoom-btn" id="${prefix}-zout" title="Zoom out">&minus;</button>
+    <button class="zoom-btn" id="${prefix}-zreset" title="Reset view">&#8863;</button>
+  </div>`;
+}
+function wireGraphChrome(el, prefix, svgId){
+  el.querySelectorAll(`.legend-row[data-bucket]`).forEach(row => {
+    row.onclick = () => {
+      const b = row.dataset.bucket;
+      if(state.riskFilter.has(b)){ if(state.riskFilter.size>1) state.riskFilter.delete(b); }
+      else state.riskFilter.add(b);
+      render();
+    };
+  });
+  const svg = document.getElementById(svgId);
+  const zin = document.getElementById(prefix+'-zin'), zout = document.getElementById(prefix+'-zout'), zreset = document.getElementById(prefix+'-zreset');
+  if(zin) zin.onclick = () => svg._zoomBy && svg._zoomBy(1.25);
+  if(zout) zout.onclick = () => svg._zoomBy && svg._zoomBy(0.8);
+  if(zreset) zreset.onclick = () => svg._resetView && svg._resetView();
+}
+
+/* ===================== OVERVIEW TAB ===================== */
+function renderOverview(el){
+  const crit = Object.entries(PKG).filter(([n,p])=>bucket(p.ripple_risk_score)==='crit');
+  const appsAffectedSet = new Set(crit.flatMap(([n,p])=>p.apps_affected));
+  const p = PKG[FEATURED];
+  const totalBucket = bucket(DATA.total_risk_score);
+
+  el.innerHTML = `
+    <div class="grid4">
+      <div class="card stat" data-stat="total" title="Go to methodology">
+        <div class="stat-top" title="A single 0-100 score blending known vulnerabilities, structural importance, and maintenance-behavior anomaly.">${icon('shield',14)} Total Risk Score</div>
+        <div class="stat-val">${fmt1(DATA.total_risk_score)}<span class="of">/100</span></div>
+        <span class="pill pill-${totalBucket}" style="width:fit-content">${bucketLabel(totalBucket)} Risk</span>
+      </div>
+      <div class="card stat" data-stat="deps" title="Browse the full graph">
+        <div class="stat-top" title="Every open-source package your services pull in, direct and transitive.">${icon('boxes',14)} Dependencies</div>
+        <div class="stat-val">${Object.keys(PKG).length}</div>
+        <div class="stat-sub">across ${ROOTS.length} services</div>
+      </div>
+      <div class="card stat" data-stat="highrisk" title="Filter the graph to these">
+        <div class="stat-top" title="Packages scoring High or Critical on the Ripple Risk Score.">${icon('alert',14)} High-Risk Dependencies</div>
+        <div class="stat-val">${Object.values(PKG).filter(p=>bucket(p.ripple_risk_score)==='crit'||bucket(p.ripple_risk_score)==='high').length}</div>
+        <div class="stat-sub">${crit.length} critical</div>
+      </div>
+      <div class="card stat" data-stat="apps" title="See attacker-ranked targets">
+        <div class="stat-top" title="How many of your services sit downstream of at least one critical-risk package.">${icon('apps',14)} Applications Affected</div>
+        <div class="stat-val">${appsAffectedSet.size}<span class="of">/ ${ROOTS.length}</span></div>
+        <div class="stat-sub">if a critical dependency fails</div>
+      </div>
+    </div>
+
+    <div class="card live-card" id="ov-live"></div>
+
+    <div class="grid2">
+      <div class="card graph-card">
+        <div class="graph-toolbar">
+          <h3>Dependency Graph</h3>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button class="btn btn-ghost" id="ov-fit">Fit to screen</button>
+            ${collapseBtnHTML('ov-graph')}
+          </div>
+        </div>
+        <div class="${bodyClass('ov-graph')}"><div class="collapsible-inner">
+          <div class="graph-wrap">
+            ${legendHTML(true)}
+            ${zoomCtlHTML('ov')}
+            <svg id="ov-graph"></svg>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="card detail-panel" style="border-color:var(--crit); background:linear-gradient(180deg, var(--crit-soft), var(--surface) 40%);">
+        <div class="crit-head">
+          <div class="crit-name">
+            <div class="crit-icon">${icon('alert')}</div>
+            <div><h3>${FEATURED}</h3><div class="v">v${p.version} (vulnerable) &middot; ${p.license}</div></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="pill pill-crit">Critical</span>
+            ${collapseBtnHTML('ov-detail')}
+          </div>
+        </div>
+        <div class="${bodyClass('ov-detail')}"><div class="collapsible-inner">
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div class="cve-line"><b>${DATA.advisory.cve}</b> &middot; ${DATA.advisory.summary}<br>Fixed in ${DATA.advisory.fixed_version} &middot; CVSS ${DATA.advisory.cvss} (${DATA.advisory.severity})</div>
+            <div>
+              <div class="score-row"><span title="Blends CVE severity, structural importance, exposure, propagation depth, and maintenance-behavior anomaly into one number.">Ripple Risk Score</span><span class="num">${fmt1(p.ripple_risk_score)} / 100</span></div>
+              <div class="score-bar-track"><div class="score-bar-fill" style="width:${p.ripple_risk_score}%; background:var(--crit)"></div></div>
+            </div>
+            <div class="factor-grid">
+              <div class="factor" title="How structurally important this package is to your services (10 = almost everything relies on it)."><div class="fv">${p.criticality}/10</div><div class="fl">Criticality</div></div>
+              <div class="factor" title="How many other packages in your tree depend on this one, directly or transitively."><div class="fv">${p.dependents}</div><div class="fl">Dependents</div></div>
+              <div class="factor" title="How reachable this package is from your live services (10 = sits close to the surface, easy to hit)."><div class="fv">${p.exposure}/10</div><div class="fl">Exposure</div></div>
+              <div class="factor" title="How normal this package's maintainer count and release pattern look to our anomaly model (10 = looks completely normal)."><div class="fv">${10-Math.round(p.unknown_risk_score/10)}/10</div><div class="fl">Trust</div></div>
+              <div class="factor" title="Number of your services that would be affected if this package were compromised."><div class="fv">${p.apps_affected_count}</div><div class="fl">Apps hit</div></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="grid2b">
+      <div class="card">
+        <div class="card-head">
+          <h3>Recommended Actions</h3>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="link" data-goto="opt">View all &rarr;</span>
+            ${collapseBtnHTML('ov-actions')}
+          </div>
+        </div>
+        <div class="${bodyClass('ov-actions')}"><div class="collapsible-inner"><div id="ov-actions"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>System Health &amp; Trust</h3>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="pill pill-low">Monitoring</span>
+            ${collapseBtnHTML('ov-health')}
+          </div>
+        </div>
+        <div class="${bodyClass('ov-health')}"><div class="collapsible-inner"><div id="ov-health"></div></div></div>
+      </div>
+    </div>
+
+    <div class="grid2b">
+      <div class="card">
+        <div class="card-head">
+          <h3>Simulate: ${FEATURED}</h3>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="link" data-goto="sim">Open simulator &rarr;</span>
+            ${collapseBtnHTML('ov-sim')}
+          </div>
+        </div>
+        <div class="${bodyClass('ov-sim')}"><div class="collapsible-inner"><div id="ov-sim"></div></div></div>
+      </div>
+      <div class="card" id="ov-cf-summary"></div>
+    </div>
+  `;
+
+  drawGraph('ov-graph', { onClick: id => { selectPkg(id); render(); }, dim: computeDim(ALL_NODES) });
+  wireGraphChrome(el, 'ov', 'ov-graph');
+  document.getElementById('ov-fit').onclick = () => { document.getElementById('ov-graph')._resetView(); };
+
+  el.querySelector('[data-stat="total"]').onclick = () => { state.tab='reports'; render(); };
+  el.querySelector('[data-stat="deps"]').onclick = () => { state.tab='graph'; state.riskFilter=new Set(['crit','high','med','low']); state.filter=''; render(); };
+  el.querySelector('[data-stat="highrisk"]').onclick = () => { state.tab='graph'; state.riskFilter=new Set(['crit','high']); state.filter=''; render(); };
+  el.querySelector('[data-stat="apps"]').onclick = () => { state.tab='sim'; state.simMode='attacker'; render(); };
+
+  renderActionsList(document.getElementById('ov-actions'), topRecommendationsFor(FEATURED, 3));
+  renderHealth(document.getElementById('ov-health'));
+  renderMiniSim(document.getElementById('ov-sim'));
+  renderCfSummary(document.getElementById('ov-cf-summary'));
+  renderLiveSummary(document.getElementById('ov-live'));
+  el.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { state.tab = b.dataset.goto; render(); });
+  wireCollapsers(el);
+}
+
+function renderActionsList(container, actions){
+  container.innerHTML = actions.map((a,i) => `
+    <div class="action-row">
+      <div class="action-check ${state.optApplied.includes(a.id)?'done':''}">${state.optApplied.includes(a.id)?icon('check',13):''}</div>
+      <div class="action-body">
+        <div class="action-title">${a.label}</div>
+        <div class="action-meta">${pct(a.reduction)} risk reduction &middot; ${a.time} &middot; ${a.effort} effort</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderHealth(container){
+  const driftFlag = Object.values(PKG).some(p=>p.unknown_risk_score>85);
+  const unknownCount = Object.values(PKG).filter(p=>p.unknown_risk_score>60).length;
+  container.innerHTML = `
+    <div class="health-row" title="Packages whose maintainer count and release pattern look unusual to our trained anomaly model -- not tied to any known CVE."><div class="health-label"><span class="health-dot" style="background:${driftFlag?'var(--high)':'var(--low)'}"></span>Behavioral Drift</div><span>${driftFlag? '1 anomaly':'No anomalies'}</span></div>
+    <div class="health-row" title="Real past supply-chain attacks we replayed against this dataset to check whether FaultLine would have flagged them."><div class="health-label"><span class="health-dot" style="background:var(--med)"></span>Historical Incidents</div><span>${DATA.incidents.length} backtested</span></div>
+    <div class="health-row" title="Packages with no known CVE that our behavioral model still flags as worth a closer look."><div class="health-label"><span class="health-dot" style="background:var(--crit)"></span>Unknown Risks</div><span>${unknownCount} detected</span></div>
+  `;
+}
+
+/* ---------- Live vulnerability monitoring ----------
+   This is the one part of FaultLine that is NOT a simulation over a fixed
+   snapshot: it queries the real, public OSV.dev vulnerability database, live,
+   from the browser, against the actual package names + pinned versions in
+   this dependency tree. It's best-effort by nature -- a browser can only
+   reach OSV.dev if the network in front of it allows the cross-origin
+   request -- so every failure path renders an honest "unavailable" state
+   rather than ever fabricating a result. */
+const OSV_BATCH_URL = 'https://api.osv.dev/v1/querybatch';
+const OSV_VULN_URL = id => `https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`;
+
+// fetch() with a hard timeout -- without this, a stalled connection (a captive
+// portal, a proxy that accepts the socket but never answers) hangs forever
+// and looks identical to "still checking" instead of surfacing as an error.
+async function fetchWithTimeout(url, opts, ms = 15000){
+  // Deliberately NOT using AbortController/signal here: passing an AbortSignal
+  // into fetch() trips a real bug in some browser extensions that intercept
+  // fetch and try to relay the request across a postMessage boundary --
+  // AbortSignal isn't structured-cloneable, so the extension throws
+  // "Failed to execute 'postMessage' on 'Window': AbortSignal object could
+  // not be cloned", which looks like an OSV.dev failure but has nothing to do
+  // with the network. A plain Promise.race gives the same timeout behavior
+  // without ever constructing an AbortSignal.
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const e = new Error('OSV.dev did not respond within 15s.');
+      e.name = 'TimeoutError';
+      reject(e);
+    }, ms);
+  });
+  try{
+    return await Promise.race([fetch(url, opts), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Turn a thrown fetch error into a message that actually says what happened,
+// instead of a single generic "can't reach it" string no matter the cause --
+// a 4xx from OSV, a timeout, and a real network/CORS failure all look very
+// different in the browser console and should look different here too.
+function describeLiveFetchError(err){
+  // Matched by message text, not `instanceof TypeError` -- a browser extension
+  // that wraps/relays fetch (as one clearly does in this environment, per the
+  // earlier AbortSignal/postMessage failure) can re-throw a plain Error that
+  // carries the original message but loses the native TypeError prototype, so
+  // an instanceof check silently falls through to the generic branch below.
+  const msg = (err && err.message) || '';
+  if(err && err.name === 'TimeoutError') return 'Timed out waiting for OSV.dev to respond (15s) -- the free API can be slow under load. Try again.';
+  if(/postMessage|could not be cloned/i.test(msg)) return 'A browser extension on this page interfered with the request (not an OSV.dev or network problem). Try again in a private/incognito window with extensions disabled.';
+  if(/failed to fetch|networkerror|network error|load failed|net::|dns|refused|cors|blocked/i.test(msg)) return `Could not reach OSV.dev from this browser (${msg}). This usually means you're offline, a firewall/VPN/corporate proxy is blocking api.osv.dev, or a browser extension is intercepting the request -- try a private/incognito window with extensions disabled, or a different network, then retry.`;
+  return `OSV.dev check failed: ${msg || 'unknown error'}.`;
+}
+
+async function runLiveScan(){
+  if(state.live.status === 'checking') return;
+  state.live.status = 'checking';
+  state.live.error = null;
+  render();
+
+  const names = Object.keys(PKG);
+  try{
+    const queries = names.map(n => ({ package: { name: n, ecosystem: 'npm' }, version: PKG[n].version }));
+    const res = await fetchWithTimeout(OSV_BATCH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queries }),
+    });
+    if(!res.ok){
+      let detail = '';
+      try{ detail = (await res.text()).slice(0, 200); }catch(e){}
+      throw new Error(`OSV.dev returned HTTP ${res.status}${detail ? ' -- ' + detail : ''}`);
+    }
+    const data = await res.json();
+    const results = data.results || [];
+
+    const findings = {};
+    const toFetch = [];
+    results.forEach((r, i) => {
+      const vulns = (r && r.vulns) || [];
+      if(!vulns.length) return;
+      findings[names[i]] = vulns.map(v => ({ id: v.id }));
+      vulns.slice(0, 2).forEach(v => toFetch.push({ pkg: names[i], id: v.id }));
+    });
+
+    // Enrich a bounded number of hits with human-readable details. A batch hit
+    // with no detail fetched yet still renders (just with its raw ID), so a
+    // slow detail call never hides a real finding.
+    const details = await Promise.all(toFetch.slice(0, 20).map(async item => {
+      try{
+        const r = await fetchWithTimeout(OSV_VULN_URL(item.id));
+        if(!r.ok) return null;
+        const v = await r.json();
+        const cve = (v.aliases || []).find(a => /^CVE-/.test(a)) || null;
+        return { pkg: item.pkg, id: item.id, cve, summary: v.summary || '', published: v.published || null, fixedVersion: liveFixedVersionFrom(v, item.pkg) };
+      }catch(e){ return null; }
+    }));
+    details.filter(Boolean).forEach(d => {
+      findings[d.pkg] = findings[d.pkg] || [];
+      const idx = findings[d.pkg].findIndex(f => f.id === d.id);
+      if(idx >= 0) findings[d.pkg][idx] = d; else findings[d.pkg].push(d);
+    });
+
+    state.live.findings = findings;
+    state.live.status = 'done';
+    state.live.lastChecked = new Date();
+  }catch(err){
+    state.live.status = 'error';
+    state.live.error = describeLiveFetchError(err);
+  }
+  render();
+}
+
+// Pull the real "fixed in" version out of an OSV vuln record, if it published
+// one for this package's npm range -- lets a live finding recommend an exact
+// upgrade instead of a generic "go patch it".
+function liveFixedVersionFrom(osvVuln, pkgName){
+  const aff = (osvVuln.affected || []).find(a => a.package && a.package.ecosystem === 'npm' && a.package.name === pkgName);
+  if(!aff) return null;
+  for(const r of (aff.ranges || [])){
+    for(const e of (r.events || [])){
+      if(e.fixed) return e.fixed;
+    }
+  }
+  return null;
+}
+
+function liveStatusInfo(){
+  const L = state.live;
+  const findingCount = Object.values(L.findings).reduce((a, v) => a + v.length, 0);
+  const pkgCount = Object.keys(L.findings).length;
+  let statusHTML, dotClass;
+  if(L.status === 'idle'){
+    statusHTML = `<span class="live-status-text">Not checked yet this session.</span>`;
+    dotClass = 'live-dot-idle';
+  } else if(L.status === 'checking'){
+    statusHTML = `<span class="live-status-text">Querying OSV.dev for all ${Object.keys(PKG).length} packages…</span>`;
+    dotClass = 'live-dot-checking';
+  } else if(L.status === 'error'){
+    statusHTML = `<span class="live-status-text live-status-error">${escapeHtml(L.error)}</span>`;
+    dotClass = 'live-dot-error';
+  } else {
+    statusHTML = findingCount
+      ? `<span class="live-status-text live-status-alert">${findingCount} live advisor${findingCount>1?'ies':'y'} found, across ${pkgCount} package${pkgCount>1?'s':''}.</span>`
+      : `<span class="live-status-text live-status-ok">No live advisories found for the versions currently pinned.</span>`;
+    dotClass = findingCount ? 'live-dot-alert' : 'live-dot-ok';
+  }
+  return { findingCount, pkgCount, statusHTML, dotClass };
+}
+
+// Real fix (from OSV's own "fixed" event) beats a generic optimizer action;
+// falling back to the existing containment optimizer means every live hit
+// still gets a concrete, structurally-evaluated recommendation even when
+// OSV didn't publish an exact fixed version.
+function liveRecommendationFor(pkgId){
+  // Route through the same engine Defender Strategy uses (bestContainmentFor ->
+  // candidateActionsFor, which already prefers the real OSV "fixed in" version
+  // when one is known) so the Live Threat Feed and Defender Strategy never
+  // disagree about which action is recommended for the same package.
+  const def = bestContainmentFor(pkgId);
+  if(!def || !def.best) return null;
+  const best = def.best;
+  const finds = state.live.findings[pkgId] || [];
+  const withFix = finds.find(f => f.fixedVersion);
+  const isRealFix = best.type === 'patch' && !!withFix;
+  const scoreBefore = scoreOf(pkgId), scoreAfter = targetScoreAfter(pkgId, best);
+  const meta = isRealFix
+    ? `Fixes ${withFix.id}${withFix.cve ? ' / ' + withFix.cve : ''} — real fix version from OSV.dev &middot; ${fmt1(scoreBefore)} &rarr; ${fmt1(scoreAfter)} risk /100`
+    : `${fmt1(scoreBefore)} &rarr; ${fmt1(scoreAfter)} risk /100 &middot; ${best.time} &middot; ${best.effort} effort (FaultLine optimizer)`;
+  return { real: isRealFix, label: best.label, meta };
+}
+
+function liveFindingsHTML(withRecommendations){
+  const L = state.live;
+  const entries = Object.entries(L.findings);
+  if(!entries.length) return '';
+  return `
+    <div class="live-findings">
+      ${entries.map(([pkg, vs]) => {
+        const rec = withRecommendations ? liveRecommendationFor(pkg) : null;
+        return vs.map((v,i) => `
+          <div class="live-finding-row">
+            <div class="live-finding-pkg">${escapeHtml(pkg)}</div>
+            <div class="live-finding-body">
+              <div class="live-finding-id"><a href="https://osv.dev/vulnerability/${encodeURIComponent(v.id)}" target="_blank" rel="noopener">${escapeHtml(v.id)}</a>${v.cve ? ` &middot; ${escapeHtml(v.cve)}` : ''}</div>
+              ${v.summary ? `<div class="live-finding-summary">${escapeHtml(v.summary)}</div>` : ''}
+              ${(withRecommendations && rec && i===0) ? `<div class="live-rec"><span class="badge-rec" style="background:${rec.real?'var(--low-soft)':'var(--accent-soft)'}; color:${rec.real?'var(--low)':'var(--accent-ink)'};">${rec.real?'Real Fix':'Recommended'}</span> <b>${escapeHtml(rec.label)}</b><div class="live-rec-meta">${rec.meta}</div></div>` : ''}
+            </div>
+          </div>
+        `).join('');
+      }).join('')}
+    </div>`;
+}
+
+/* Compact status card shown on Overview -- just enough to know whether to
+   worry, with a link into the full Live Threat Feed tab for detail. */
+function renderLiveSummary(container){
+  const { statusHTML, dotClass } = liveStatusInfo();
+  const L = state.live;
+  container.innerHTML = `
+    <div class="live-row">
+      <div class="live-left">
+        <span class="live-dot ${dotClass}"></span>
+        <div>
+          <div class="live-title">${icon('radar',15)} Live Threat Feed <span class="badge-rec">OSV.DEV</span></div>
+          <div class="${bodyClass('ov-live')}"><div class="collapsible-inner">
+            ${statusHTML}
+            ${L.lastChecked ? `<div class="live-time">Last checked ${L.lastChecked.toLocaleTimeString()}</div>` : ''}
+          </div></div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="link" data-goto="live">Open live feed &rarr;</span>
+        ${collapseBtnHTML('ov-live')}
+      </div>
+    </div>
+  `;
+}
+
+/* ===================== LIVE THREAT FEED TAB ===================== */
+function renderLiveTab(el){
+  const { findingCount, pkgCount, statusHTML, dotClass } = liveStatusInfo();
+  const L = state.live;
+  const names = Object.keys(PKG);
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3>${icon('radar',16)} Live Threat Feed <span class="badge-rec">OSV.DEV</span></h3>
+        ${collapseBtnHTML('live-header')}
+      </div>
+      <div class="${bodyClass('live-header')}"><div class="collapsible-inner">
+        <div class="info-note" style="margin-top:0; margin-bottom:14px;">FaultLine already knows about one real CVE and three real historical incidents on this dependency tree (below) -- that part never depends on a network call. "Check live vulnerabilities" adds a second, live layer on top: it queries the real, public OSV.dev vulnerability database from your browser, against every pinned package version here, so you also catch anything disclosed since this dataset was built.</div>
+        <div class="live-row">
+          <div class="live-left">
+            <span class="live-dot ${dotClass}"></span>
+            <div>
+              ${statusHTML}
+              ${L.lastChecked ? `<div class="live-time">Last checked ${L.lastChecked.toLocaleTimeString()}</div>` : ''}
+            </div>
+          </div>
+          <button class="btn btn-primary" id="live-check-btn" ${L.status==='checking'?'disabled':''}>${L.status==='checking' ? 'Checking…' : 'Check live vulnerabilities'}</button>
+        </div>
+        <div class="metric-row">
+          <div class="metric-box"><div class="mv">${names.length}</div><div class="ml">packages checked</div></div>
+          <div class="metric-box"><div class="mv">${findingCount}</div><div class="ml">live advisories</div></div>
+          <div class="metric-box"><div class="mv">${pkgCount}</div><div class="ml">packages affected</div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Verified &amp; Backtested <span class="badge-rec" style="background:var(--low-soft); color:var(--low);">ON FILE</span></h3>
+        ${collapseBtnHTML('live-verified')}
+      </div>
+      <div class="${bodyClass('live-verified')}"><div class="collapsible-inner">
+        <div class="action-row">
+          <div class="crit-icon" style="width:30px;height:30px;background:var(--crit-soft); color:var(--crit);">${icon('alert',15)}</div>
+          <div class="action-body">
+            <div class="action-title">${escapeHtml(DATA.advisory.cve)} <span style="font-weight:500; color:var(--muted);">&middot; ${escapeHtml(FEATURED)}</span></div>
+            <div class="action-meta">${escapeHtml(DATA.advisory.summary)} &middot; Fixed in ${escapeHtml(DATA.advisory.fixed_version)} &middot; CVSS ${DATA.advisory.cvss} (${escapeHtml(DATA.advisory.severity)})</div>
+          </div>
+        </div>
+        ${DATA.incidents.map(inc => `
+        <div class="action-row" style="margin-top:8px;">
+          <div class="crit-icon" style="width:30px;height:30px;background:var(--med-soft); color:var(--med);">${icon('alert',15)}</div>
+          <div class="action-body">
+            <div class="action-title">${escapeHtml(inc.name)} <span style="font-weight:500; color:var(--muted);">&middot; ${escapeHtml(inc.date)}</span></div>
+            <div class="action-meta">${escapeHtml(inc.description)}</div>
+            <div style="margin-top:5px;">${inc.pattern.map(p=>`<span class="pill pill-accent" style="margin:2px 4px 2px 0;">${escapeHtml(p)}</span>`).join('')}</div>
+          </div>
+        </div>`).join('')}
+      </div></div>
+    </div>
+
+    ${findingCount ? `
+    <div class="card">
+      <div class="card-head">
+        <h3>Findings &amp; Recommendations</h3>
+        ${collapseBtnHTML('live-findings')}
+      </div>
+      <div class="${bodyClass('live-findings')}"><div class="collapsible-inner">
+        ${liveFindingsHTML(true)}
+      </div></div>
+    </div>` : ''}
+
+    <div class="card">
+      <div class="card-head">
+        <h3>All Packages &mdash; Live Status</h3>
+        ${collapseBtnHTML('live-table')}
+      </div>
+      <div class="${bodyClass('live-table')}"><div class="collapsible-inner">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Package</th><th>Pinned Version</th><th>Live Status</th></tr></thead>
+            <tbody>
+              ${names.map(n => {
+                const finds = L.findings[n];
+                let pill;
+                if(finds && finds.length) pill = `<span class="pill pill-crit">${finds.length} advisor${finds.length>1?'ies':'y'}</span>`;
+                else if(L.status==='done') pill = `<span class="pill pill-low">Clean</span>`;
+                else if(L.status==='checking') pill = `<span class="pill" style="background:var(--surface-2); color:var(--muted);">Checking…</span>`;
+                else if(L.status==='error') pill = `<span class="pill" style="background:var(--high-soft); color:var(--high);">Unchecked</span>`;
+                else pill = `<span class="pill" style="background:var(--surface-2); color:var(--muted);">Not yet checked</span>`;
+                return `<tr data-seed="${escapeHtml(n)}"><td style="font-weight:600;">${escapeHtml(n)}</td><td class="num">v${escapeHtml(PKG[n].version)}</td><td>${pill}</td></tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div></div>
+    </div>
+  `;
+  document.getElementById('live-check-btn').onclick = runLiveScan;
+  wireCollapsers(el);
+}
+
+/* ---------- Upload Project: scan a visitor's own manifest against OSV.dev ----------
+   This deliberately stays separate from the embedded PKG/FWD/REV demo graph --
+   an uploaded project doesn't have real maintainer/download/behavioral-trust
+   history for us to show, and fabricating a Ripple Risk Score for it would be
+   exactly the kind of "random metric" this dashboard is built to call out in
+   other tools. So this feature tells the truth about what it actually knows:
+   real package names + versions parsed straight from the uploaded manifest,
+   checked live against the real OSV.dev database, with real "fixed in"
+   versions where OSV publishes one -- nothing invented. */
+const UPLOAD_MAX_PACKAGES = 60;
+
+function parseManifestText(text, fileName){
+  let json;
+  try{ json = JSON.parse(text); }
+  catch(e){ throw new Error('That file isn\'t valid JSON. Upload a package.json or package-lock.json.'); }
+
+  const out = new Map(); // name -> version (first one wins)
+  const add = (name, version) => {
+    if(!name || out.has(name)) return;
+    out.set(name, version || 'unknown');
+  };
+
+  if(json.packages && typeof json.packages === 'object'){
+    // npm lockfile v2/v3
+    Object.entries(json.packages).forEach(([key, val]) => {
+      if(!key) return; // "" is the root project itself
+      const idx = key.lastIndexOf('node_modules/');
+      const name = idx === -1 ? null : key.slice(idx + 'node_modules/'.length);
+      if(name && val && val.version) add(name, val.version);
+    });
+    return { packages: [...out.entries()].map(([name, version]) => ({name, version})), source: 'lock' };
+  }
+  if(json.dependencies && typeof json.dependencies === 'object' && Object.values(json.dependencies).some(v => v && typeof v === 'object' && v.version)){
+    // npm lockfile v1
+    const walk = (deps) => Object.entries(deps || {}).forEach(([name, val]) => {
+      if(val && val.version) add(name, val.version);
+      if(val && val.dependencies) walk(val.dependencies);
+    });
+    walk(json.dependencies);
+    return { packages: [...out.entries()].map(([name, version]) => ({name, version})), source: 'lock' };
+  }
+  if(json.dependencies || json.devDependencies){
+    // plain package.json -- direct deps only, version ranges stripped to a concrete-ish version
+    Object.entries({ ...(json.dependencies||{}), ...(json.devDependencies||{}) }).forEach(([name, spec]) => {
+      const stripped = String(spec).replace(/^[^\d]*/, '').trim();
+      add(name, /^\d/.test(stripped) ? stripped : null);
+    });
+    return { packages: [...out.entries()].map(([name, version]) => ({name, version: version||'latest'})), source: 'manifest' };
+  }
+  throw new Error('Couldn\'t find any dependencies in that file. Upload a package.json or package-lock.json.');
+}
+
+function handleUploadFile(file){
+  const U = state.upload;
+  U.status = 'reading'; U.error = null; U.fileName = file.name; render();
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const { packages, source } = parseManifestText(String(reader.result), file.name);
+      if(!packages.length) throw new Error('That file has no dependencies to scan.');
+      U.packages = packages;
+      U.source = source;
+      U.findings = {};
+      U.status = 'idle';
+      render();
+      runUploadScan();
+    }catch(err){
+      U.status = 'error';
+      U.error = err.message || 'Could not read that file.';
+      render();
+    }
+  };
+  reader.onerror = () => { U.status = 'error'; U.error = 'Could not read that file.'; render(); };
+  reader.readAsText(file);
+}
+
+async function runUploadScan(){
+  const U = state.upload;
+  if(U.status === 'checking' || !U.packages.length) return;
+  U.status = 'checking'; U.error = null; render();
+
+  const scanList = U.packages.slice(0, UPLOAD_MAX_PACKAGES);
+  try{
+    const queries = scanList.map(p => ({ package: { name: p.name, ecosystem: 'npm' }, version: p.version === 'unknown' || p.version === 'latest' ? undefined : p.version }));
+    const res = await fetchWithTimeout(OSV_BATCH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queries }),
+    });
+    if(!res.ok){
+      let detail = '';
+      try{ detail = (await res.text()).slice(0, 200); }catch(e){}
+      throw new Error(`OSV.dev returned HTTP ${res.status}${detail ? ' -- ' + detail : ''}`);
+    }
+    const data = await res.json();
+    const results = data.results || [];
+
+    const findings = {};
+    const toFetch = [];
+    results.forEach((r, i) => {
+      const vulns = (r && r.vulns) || [];
+      if(!vulns.length) return;
+      findings[scanList[i].name] = vulns.map(v => ({ id: v.id }));
+      vulns.slice(0, 2).forEach(v => toFetch.push({ pkg: scanList[i].name, id: v.id }));
+    });
+
+    const details = await Promise.all(toFetch.slice(0, 25).map(async item => {
+      try{
+        const r = await fetchWithTimeout(OSV_VULN_URL(item.id));
+        if(!r.ok) return null;
+        const v = await r.json();
+        const cve = (v.aliases || []).find(a => /^CVE-/.test(a)) || null;
+        return { pkg: item.pkg, id: item.id, cve, summary: v.summary || '', published: v.published || null, fixedVersion: liveFixedVersionFrom(v, item.pkg) };
+      }catch(e){ return null; }
+    }));
+    details.filter(Boolean).forEach(d => {
+      findings[d.pkg] = findings[d.pkg] || [];
+      const idx = findings[d.pkg].findIndex(f => f.id === d.id);
+      if(idx >= 0) findings[d.pkg][idx] = d; else findings[d.pkg].push(d);
+    });
+
+    U.findings = findings;
+    U.status = 'done';
+  }catch(err){
+    U.status = 'error';
+    U.error = describeLiveFetchError(err);
+  }
+  render();
+}
+
+function renderUploadTab(el){
+  const U = state.upload;
+  const hasPkgs = U.packages.length > 0;
+  const findingCount = Object.values(U.findings).reduce((a, v) => a + v.length, 0);
+  const affectedCount = Object.keys(U.findings).length;
+  const shown = U.packages.slice(0, UPLOAD_MAX_PACKAGES);
+  const truncated = U.packages.length > UPLOAD_MAX_PACKAGES;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head"><h3>${icon('upload',16)} Upload Your Project</h3></div>
+      <div class="info-note" style="margin-top:0; margin-bottom:14px;">Drop in your own <code>package.json</code> or <code>package-lock.json</code> and FaultLine checks every dependency it finds against the real, live OSV.dev vulnerability database -- right here in your browser, nothing uploaded to a server. This view shows only what OSV.dev actually reports for your packages; it doesn't invent a Ripple Risk Score for code we've never modeled.</div>
+      <div class="live-row">
+        <div class="live-left">
+          <span class="live-dot ${
+            U.status==='error' ? 'live-dot-error' :
+            U.status==='checking' || U.status==='reading' ? 'live-dot-checking' :
+            U.status==='done' ? (Object.keys(U.findings).length ? 'live-dot-alert' : 'live-dot-ok') :
+            'live-dot-idle'
+          }"></span>
+          <div>
+            <div class="live-title">${U.fileName ? escapeHtml(U.fileName) : 'No file selected yet'}</div>
+            <span class="live-status-text">${
+              U.status==='reading' ? 'Reading file…' :
+              U.status==='checking' ? `Checking ${shown.length} package${shown.length!==1?'s':''} against OSV.dev…` :
+              U.status==='error' ? escapeHtml(U.error||'Something went wrong.') :
+              hasPkgs ? `Parsed ${U.packages.length} package${U.packages.length!==1?'s':''} from a ${U.source==='lock'?'lockfile':'package.json'}${U.status==='done' ? ' &middot; scan complete' : ''}` :
+              'Choose a package.json or package-lock.json to begin.'
+            }</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input type="file" id="upload-file-input" accept=".json,application/json" style="display:none;">
+          <button class="btn btn-ghost" id="upload-pick-btn">${hasPkgs ? 'Choose a different file' : 'Choose file'}</button>
+          ${hasPkgs && U.status!=='checking' ? `<button class="btn btn-primary" id="upload-rescan-btn">${icon('radar',14)} Re-scan</button>` : ''}
+        </div>
+      </div>
+      ${hasPkgs ? `
+      <div class="metric-row" style="margin-top:14px;">
+        <div class="metric-box"><div class="mv">${shown.length}${truncated?`/${U.packages.length}`:''}</div><div class="ml">packages scanned</div></div>
+        <div class="metric-box"><div class="mv">${findingCount}</div><div class="ml">live advisories</div></div>
+        <div class="metric-box"><div class="mv">${affectedCount}</div><div class="ml">packages affected</div></div>
+      </div>
+      ${truncated ? `<div class="meta-line">Showing the first ${UPLOAD_MAX_PACKAGES} packages parsed from your file to keep the live check fast.</div>` : ''}` : ''}
+    </div>
+
+    ${hasPkgs && findingCount ? `
+    <div class="card">
+      <div class="card-head"><h3>Findings &amp; Recommendations</h3></div>
+      ${uploadFindingsHTML()}
+    </div>` : ''}
+
+    ${hasPkgs ? `
+    <div class="card">
+      <div class="card-head"><h3>Scanned Packages</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Package</th><th>Version</th><th>Live Status</th></tr></thead>
+          <tbody>
+            ${shown.map(p => {
+              const finds = U.findings[p.name];
+              let pill;
+              if(finds && finds.length) pill = `<span class="pill pill-crit">${finds.length} advisor${finds.length>1?'ies':'y'}</span>`;
+              else if(U.status==='done') pill = `<span class="pill pill-low">Clean</span>`;
+              else if(U.status==='checking') pill = `<span class="pill" style="background:var(--surface-2); color:var(--muted);">Checking…</span>`;
+              else pill = `<span class="pill" style="background:var(--surface-2); color:var(--muted);">Not yet checked</span>`;
+              return `<tr><td style="font-weight:600;">${escapeHtml(p.name)}</td><td class="num">${escapeHtml(p.version)}</td><td>${pill}</td></tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : ''}
+  `;
+
+  const input = document.getElementById('upload-file-input');
+  document.getElementById('upload-pick-btn').onclick = () => input.click();
+  input.onchange = (e) => { if(e.target.files && e.target.files[0]) handleUploadFile(e.target.files[0]); };
+  const rescanBtn = document.getElementById('upload-rescan-btn');
+  if(rescanBtn) rescanBtn.onclick = runUploadScan;
+}
+
+function uploadFindingsHTML(){
+  const U = state.upload;
+  const entries = Object.entries(U.findings);
+  if(!entries.length) return '';
+  return `
+    <div class="live-findings">
+      ${entries.map(([pkg, vs]) => vs.map((v) => `
+        <div class="live-finding-row">
+          <div class="live-finding-pkg">${escapeHtml(pkg)}</div>
+          <div class="live-finding-body">
+            <div class="live-finding-id"><a href="https://osv.dev/vulnerability/${encodeURIComponent(v.id)}" target="_blank" rel="noopener">${escapeHtml(v.id)}</a>${v.cve ? ` &middot; ${escapeHtml(v.cve)}` : ''}</div>
+            ${v.summary ? `<div class="live-finding-summary">${escapeHtml(v.summary)}</div>` : ''}
+            <div class="live-rec">
+              ${v.fixedVersion
+                ? `<span class="badge-rec" style="background:var(--low-soft); color:var(--low);">Real Fix</span> <b>Update ${escapeHtml(pkg)} to ${escapeHtml(v.fixedVersion)}</b><div class="live-rec-meta">real fix version from OSV.dev</div>`
+                : `No fixed version published yet by OSV.dev &mdash; track this advisory or consider an alternative package.`}
+            </div>
+          </div>
+        </div>
+      `).join('')).join('')}
+    </div>
+  `;
+}
+
+function renderMiniSim(container){
+  const r = blastRadius([FEATURED]);
+  container.innerHTML = `
+    <div class="metric-row">
+      <div class="metric-box"><div class="mv">${r.appsAffected.length}</div><div class="ml">applications</div></div>
+      <div class="metric-box"><div class="mv">${r.pkgsAffected.length}</div><div class="ml">packages</div></div>
+      <div class="metric-box"><div class="mv">${r.maxDepth}</div><div class="ml">levels deep</div></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%; justify-content:center" id="ov-run-sim">${icon('play',14)} Run Simulation</button>
+  `;
+  document.getElementById('ov-run-sim').onclick = () => { selectPkg(FEATURED); state.tab='sim'; state.simSeeds=[FEATURED]; render(); startSimAnimation(); };
+}
+
+/* Scenario metadata for the "what if" architecture explorer -- each one is a
+   real structural mutation you can point at any package/service in this
+   portfolio, not a single fixed canned example. */
+const CF_SCENARIOS = [
+  {type:'add', label:'Add dependency', icon:'plus', options: () => ROOTS, unit:'into'},
+  {type:'remove', label:'Remove dependency', icon:'minus', options: () => Object.keys(PKG).sort((a,b)=>scoreOf(b)-scoreOf(a)), unit:'package'},
+  {type:'replace', label:'Replace dependency', icon:'swap', options: () => Object.keys(PKG).sort((a,b)=>scoreOf(b)-scoreOf(a)), unit:'package'},
+  {type:'isolate', label:'Isolate service', icon:'isolate', options: () => ROOTS, unit:'service'},
+];
+function cfDescription(type, target){
+  if(type==='add') return `Adds a brand-new, unvetted dependency directly into <b>${target}</b> and scores it like a typical unknown package.`;
+  if(type==='remove') return `Removes <b>${target}</b> from the tree entirely -- as if the feature that needed it were dropped.`;
+  if(type==='replace') return `Swaps <b>${target}</b> for a hypothetical vetted fork with near-zero behavioral-trust risk.`;
+  if(type==='isolate') return `Cuts <b>${target}</b> off from all of its direct dependencies -- vendoring or a strict allowlist.`;
+  return '';
+}
+function renderMiniCounterfactual(container){
+  // A proper segmented control -- exactly one scenario selected at all times
+  // (never a blank/collapsed state), so the panel always shows a live result
+  // instead of a pile of four pre-computed deltas the user has to compare
+  // before picking one.
+  if(!state.cfType) state.cfType = CF_SCENARIOS[0].type;
+  const active = CF_SCENARIOS.find(s => s.type === state.cfType) || CF_SCENARIOS[0];
+  const target = state.cfTargets[active.type];
+  const d = previewCounterfactual(active.type, target);
+  const neg = d.delta <= 0;
+  const opts = active.options();
+
+  const segHtml = CF_SCENARIOS.map(s => `
+    <button class="cf-seg-btn ${s.type===active.type?'active':''}" data-cf="${s.type}">
+      ${icon(s.icon,14)}<span>${s.label}</span>
+    </button>`).join('');
+
+  container.innerHTML = `
+    <div class="cf-seg">${segHtml}</div>
+    <div class="cf-detail">
+      <div class="cf-detail-head">
+        <div class="cf-icon cf-icon-lg">${icon(active.icon,16)}</div>
+        <div class="cf-detail-title">
+          <span>${active.label}</span>
+          <select id="cf-target-select">
+            ${opts.map(o=>`<option value="${escapeHtml(o)}" ${o===target?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+          </select>
+        </div>
+        <span class="cf-badge">${icon('dot',8)} live on graph</span>
+      </div>
+      <div class="cf-desc">${cfDescription(active.type, target)}</div>
+      <div class="metric-row">
+        <div class="metric-box"><div class="mv">${fmt1(d.before)}</div><div class="ml">before</div></div>
+        <div class="metric-box"><div class="mv">${fmt1(d.after)}</div><div class="ml">after</div></div>
+        <div class="metric-box"><div class="mv" style="color:${neg?'var(--low)':'var(--crit)'}">${neg?'':'+'}${fmt1(d.delta)}</div><div class="ml">risk score</div></div>
+      </div>
+    </div>`;
+
+  container.querySelectorAll('[data-cf]').forEach(btn => btn.onclick = () => {
+    state.cfType = btn.dataset.cf;
+    render();
+  });
+  const sel = document.getElementById('cf-target-select');
+  if(sel) sel.onchange = (e) => { state.cfTargets[active.type] = e.target.value; render(); };
+}
+
+/* Compact Overview card -- links into the full Counterfactual Architecture
+   tab, same pattern as the Live Threat Feed summary. */
+function renderCfSummary(container){
+  container.innerHTML = `
+    <div class="live-row">
+      <div class="live-left">
+        <span class="live-dot" style="background:var(--cf); color:var(--cf);"></span>
+        <div>
+          <div class="live-title">${icon('swap',15)} Counterfactual Architecture</div>
+          <span class="live-status-text">Explore "what if" redesigns and see the risk delta live on the graph.</span>
+        </div>
+      </div>
+      <span class="link" data-goto="cf">Open explorer &rarr;</span>
+    </div>
+  `;
+}
+
+/* ===================== COUNTERFACTUAL ARCHITECTURE TAB ===================== */
+function renderCfTab(el){
+  el.innerHTML = `
+    <div class="grid2">
+      <div class="card graph-card">
+        <div class="graph-toolbar">
+          <h3>Dependency Graph</h3>
+          <button class="btn btn-ghost" id="cf-fit">Fit to screen</button>
+        </div>
+        <div class="graph-wrap">
+          ${legendHTML(true)}
+          ${zoomCtlHTML('cf')}
+          <svg id="cf-graph"></svg>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Counterfactual Architecture</h3></div>
+        <div class="meta-small" style="margin:-8px 0 12px;">Pick a hypothetical change below and see its risk delta computed live against the real dependency graph.</div>
+        <div id="cf-explorer"></div>
+      </div>
+    </div>
+  `;
+  drawGraph('cf-graph', { onClick: id => { selectPkg(id); render(); }, dim: computeDim(ALL_NODES), highlight: currentCfHighlight(), highlightColor: '--cf' });
+  wireGraphChrome(el, 'cf', 'cf-graph');
+  document.getElementById('cf-fit').onclick = () => { document.getElementById('cf-graph')._resetView(); };
+  renderMiniCounterfactual(document.getElementById('cf-explorer'));
+}
+
+/* The graph-highlight set for whichever counterfactual scenario is currently
+   expanded on the Overview, so the "what if" card and the dependency graph
+   above it tell one connected story instead of the card being a dead-end
+   number with no visible effect anywhere else on the page. */
+function currentCfHighlight(){
+  if(!state.cfType) return null;
+  return previewCounterfactual(state.cfType, state.cfTargets[state.cfType]).highlight;
+}
+
+/* Live counterfactual preview computations -- a real structural mutation +
+   recompute against the SAME engine the Optimization tab uses, pointed at
+   whichever package/service the picker currently selects. */
+function previewCounterfactual(type, target){
+  const base = totalRisk(cloneAdj(), {});
+  let adj = cloneAdj(); let overrides = {};
+  let tempNode = null;
+  const highlight = new Set([target]);
+  if(type==='add'){
+    tempNode = 'hypothetical-pkg';
+    PKG[tempNode] = { ripple_risk_score: 50, dependents: 0, apps_affected: [target], criticality:2, exposure:5, propagation_depth:0, unknown_risk_score:50, maintainers:3, last_release_days:30, downloads_m:1, version:'0.1.0', license:'MIT' };
+    adj = applyMutation(adj, {type:'add', root:target, payload:tempNode});
+  }
+  if(type==='remove'){
+    adj = applyMutation(adj, {type:'remove', target});
+    (REV[target]||[]).forEach(n=>highlight.add(n));
+  }
+  if(type==='replace'){
+    const payload = target+'-safe-fork';
+    adj = applyMutation(adj, {type:'replace', target, payload});
+    overrides[payload] = 20;
+    (REV[target]||[]).forEach(n=>highlight.add(n));
+  }
+  if(type==='isolate'){
+    adj = applyMutation(adj, {type:'isolate', target});
+    (FWD[target]||[]).forEach(n=>highlight.add(n));
+  }
+  const after = totalRisk(adj, overrides);
+  if(tempNode) delete PKG[tempNode]; // scratch node only -- never persisted
+  return { before: base, after, delta: after-base, highlight };
+}
+
+/* ===================== recommendations / optimizer engine ===================== */
+/* Candidate interventions are generated FOR a specific scenario package --
+   using that package's own real data (does it carry the actual CVE? which
+   real services does it reach per apps_affected?) -- so different scenarios
+   genuinely produce different options and different numbers, not a fixed
+   6-item list recycled for everything. */
+function patchedScore(target){
+  const s = scoreOf(target);
+  const hasCVE = target === FEATURED;
+  // Patching resolves the CVE-severity term entirely (the largest weighted
+  // factor in the score); pinning a non-CVE package mainly resolves the
+  // maintenance/behavioral-trust term, a smaller share of the composite --
+  // so a real CVE fix cuts further than a routine pin-to-latest.
+  return Math.round((hasCVE ? s*0.35 : s*0.55) * 10) / 10;
+}
+function candidateActionsFor(target){
+  const p = PKG[target];
+  if(!p) return [];
+  const hasCVE = target === FEATURED;
+  // Once a live OSV.dev check has found a real "fixed in" version for this
+  // package, the patch action names that exact version everywhere it's
+  // recommended (Defender Strategy, Optimization, the Live Threat Feed) --
+  // one real fix, one consistent label, instead of each screen independently
+  // guessing at generic phrasing.
+  const liveFix = (state.live.findings[target] || []).find(f => f.fixedVersion);
+  const actions = [];
+  actions.push({
+    id: `patch-${target}`,
+    label: liveFix ? `Update ${target} to ${liveFix.fixedVersion}` : (hasCVE ? `Patch ${target} to ${DATA.advisory.fixed_version}` : `Pin ${target} to latest maintained release`),
+    type: 'patch', target, overrideScore: patchedScore(target),
+    time: (hasCVE || liveFix) ? '1 day' : '< 1 day', effort: 'Low', effortW: 1,
+  });
+  if(target === 'lodash'){
+    actions.push({ id:'replace-lodash', label:'Replace lodash with lodash-es', type:'replace', target:'lodash', payload:'lodash-es', overridePayloadScore: 22, time:'2-3 days', effort:'Medium', effortW:2 });
+  }
+  (p.apps_affected||[]).forEach(app => {
+    actions.push({
+      id: `isolate-${app}-${target}`,
+      label: `Isolate ${app} from ${target} chain`,
+      type: 'isolate', target: app,
+      time: '1-2 days', effort: 'Medium', effortW: 2,
+    });
+  });
+  return actions;
+}
+function evaluateAction(a, baseAdj, baseOverrides){
+  let adj = { FWD: JSON.parse(JSON.stringify(baseAdj.FWD)), REV: JSON.parse(JSON.stringify(baseAdj.REV)) };
+  let overrides = Object.assign({}, baseOverrides);
+  if(a.type==='patch'){ overrides[a.target] = a.overrideScore; }
+  if(a.type==='replace'){ adj = applyMutation(adj, {type:'replace', target:a.target, payload:a.payload}); overrides[a.payload] = a.overridePayloadScore; }
+  if(a.type==='isolate'){ adj = applyMutation(adj, {type:'isolate', target:a.target}); }
+  return { adj, overrides };
+}
+function topRecommendationsFor(target, n){
+  const base = totalRisk(cloneAdj(), {});
+  const scored = candidateActionsFor(target).map(a => {
+    const {adj, overrides} = evaluateAction(a, cloneAdj(), {});
+    const after = totalRisk(adj, overrides);
+    const reduction = Math.max(0, (base-after)/base*100);
+    return Object.assign({}, a, { reduction, ratio: reduction/a.effortW });
+  }).sort((x,y)=>y.ratio-x.ratio);
+  return scored.slice(0,n);
+}
+function minimumInterventionSet(target, targetDropPct){
+  let adj = cloneAdj(); let overrides = {}; const chosen = [];
+  let base = totalRisk(adj, overrides);
+  const dropTarget = base * (1 - targetDropPct);
+  const pool = candidateActionsFor(target).slice();
+  let current = base;
+  while(current > dropTarget && pool.length){
+    let bestIdx=-1, bestAfter=current, bestA=null;
+    pool.forEach((a,i)=>{
+      const r = evaluateAction(a, adj, overrides);
+      const after = totalRisk(r.adj, r.overrides);
+      if(after < bestAfter){ bestAfter=after; bestIdx=i; bestA=r; }
+    });
+    if(bestIdx===-1) break;
+    chosen.push(pool[bestIdx]);
+    adj = bestA.adj; overrides = bestA.overrides; current = bestAfter;
+    pool.splice(bestIdx,1);
+  }
+  return { chosen, before: base, after: current, target: dropTarget };
+}
+
+/* ===================== GRAPH TAB ===================== */
+function renderGraphTab(el){
+  const selIsRoot = isRoot(state.selected);
+  const sel = selIsRoot ? state.selected : (PKG[state.selected] ? state.selected : FEATURED);
+
+  el.innerHTML = `
+    <div class="grid2">
+      <div class="card graph-card">
+        <div class="graph-toolbar">
+          <div><h3>Full Dependency Graph</h3><div class="meta-small">${Object.keys(PKG).length} packages &middot; ${ROOTS.length} services</div></div>
+        </div>
+        <div class="graph-wrap" style="height:560px;">
+          ${legendHTML(false)}
+          ${zoomCtlHTML('full')}
+          <svg id="full-graph"></svg>
+        </div>
+      </div>
+      <div class="card detail-panel" id="graph-detail"></div>
+    </div>
+  `;
+  drawGraph('full-graph', { onClick: id => { selectPkg(id); render(); }, dim: computeDim(ALL_NODES) });
+  wireGraphChrome(el, 'full', 'full-graph');
+  renderGraphDetail(document.getElementById('graph-detail'), sel, selIsRoot);
+  el.querySelectorAll('[data-node]').forEach(pill => pill.onclick = () => { selectPkg(pill.dataset.node); render(); });
+}
+
+function renderGraphDetail(container, sel, selIsRoot){
+  if(selIsRoot){
+    const direct = FWD[sel] || [];
+    const closure = depsClosure(sel);
+    const ranked = closure.map(n => PKG[n]).filter(Boolean).sort((a,b)=>b.ripple_risk_score-a.ripple_risk_score);
+    const top = ranked[0];
+    const topName = top ? closure.find(n => PKG[n] === top) : null;
+    container.innerHTML = `
+      <div class="crit-head">
+        <div class="crit-name"><div class="crit-icon" style="background:var(--accent-soft); color:var(--accent-ink)">${icon('shield')}</div>
+        <div><h3>${escapeHtml(sel)}</h3><div class="v">Service &middot; ${direct.length} direct &middot; ${closure.length} total dependencies</div></div></div>
+        ${top ? `<span class="pill pill-${bucket(top.ripple_risk_score)}">${bucketLabel(bucket(top.ripple_risk_score))} exposure</span>` : `<span class="pill pill-low">No exposure</span>`}
+      </div>
+      ${top ? `
+      <div class="score-row"><span title="The single riskiest package this service depends on, direct or transitive.">Highest-risk dependency &middot; <b>${escapeHtml(topName)}</b></span><span class="num">${fmt1(top.ripple_risk_score)}/100</span></div>
+      <div class="score-bar-track"><div class="score-bar-fill" style="width:${top.ripple_risk_score}%; background:var(--${bucket(top.ripple_risk_score)})"></div></div>
+      ` : `<div class="empty-hint">No modeled packages depend from this service.</div>`}
+      <div>
+        <h3 style="font-size:13px; margin-bottom:6px;">Direct dependencies</h3>
+        ${direct.length ? direct.map(d=>`<span class="pill pill-accent" data-node="${d}" style="margin:2px 4px 2px 0; cursor:pointer;">${d}</span>`).join('') : '<span class="empty-hint">None modeled.</span>'}
+      </div>
+      ${topName ? `<button class="btn btn-primary" style="width:100%; justify-content:center" id="graph-simulate">${icon('play',14)} Simulate compromise via ${escapeHtml(topName)}</button>` : ''}
+    `;
+    if(topName) document.getElementById('graph-simulate').onclick = () => { selectPkg(topName); state.tab='sim'; state.simMode='single'; state.simSeeds=[topName]; render(); startSimAnimation(); };
+    container.querySelectorAll('[data-node]').forEach(pill => pill.onclick = () => { selectPkg(pill.dataset.node); render(); });
+    return;
+  }
+
+  const p = PKG[sel];
+  container.innerHTML = `
+    <div class="crit-head">
+      <div class="crit-name"><div class="crit-icon" style="background:var(--accent-soft); color:var(--accent-ink)">${icon('cube')}</div>
+      <div><h3>${escapeHtml(sel)}</h3><div class="v">v${p.version} &middot; ${p.license} &middot; ${p.is_direct?'Direct':'Transitive'}</div></div></div>
+      <span class="pill pill-${bucket(p.ripple_risk_score)}">${bucketLabel(bucket(p.ripple_risk_score))}</span>
+    </div>
+    <div class="score-row"><span title="Blends CVE severity, structural importance, exposure, propagation depth, and maintenance-behavior anomaly into one number.">Ripple Risk Score</span><span class="num">${fmt1(p.ripple_risk_score)}/100</span></div>
+    <div class="score-bar-track"><div class="score-bar-fill" style="width:${p.ripple_risk_score}%; background:var(--${bucket(p.ripple_risk_score)})"></div></div>
+    <div class="factor-grid">
+      <div class="factor" title="How structurally important this package is to your services (10 = almost everything relies on it)."><div class="fv">${p.criticality}/10</div><div class="fl">Criticality</div></div>
+      <div class="factor" title="How many other packages in your tree depend on this one, directly or transitively."><div class="fv">${p.dependents}</div><div class="fl">Dependents</div></div>
+      <div class="factor" title="How many steps this package sits from your live services -- shorter means a compromise reaches you faster."><div class="fv">${p.propagation_depth}</div><div class="fl">Depth</div></div>
+      <div class="factor" title="Number of your services that would be affected if this package were compromised."><div class="fv">${p.apps_affected_count}</div><div class="fl">Apps</div></div>
+      <div class="factor" title="How normal this package's maintainer count and release pattern look to our anomaly model (10 = looks completely normal)."><div class="fv">${10-Math.round(p.unknown_risk_score/10)}/10</div><div class="fl">Trust</div></div>
+    </div>
+    <div class="meta-line">
+      <b>Maintainers:</b> ${p.maintainers} &middot; <b>Last release:</b> ${p.last_release_days}d ago &middot; <b>Downloads:</b> ${p.downloads_m}M/wk<br>
+      ${sel===FEATURED ? `<b>${DATA.advisory.cve}</b> -- ${DATA.advisory.summary} (CVSS ${DATA.advisory.cvss})` : 'No known CVE on file for this package.'}
+    </div>
+    <div>
+      <h3 style="font-size:13px; margin-bottom:6px;">Reaches these services</h3>
+      ${p.apps_affected.length? p.apps_affected.map(a=>`<span class="pill pill-accent" data-node="${a}" style="margin:2px 4px 2px 0; cursor:pointer;">${a}</span>`).join(''): '<span class="empty-hint">No modeled service currently depends on this package.</span>'}
+    </div>
+    <button class="btn btn-primary" style="width:100%; justify-content:center" id="graph-simulate">${icon('play',14)} Simulate compromise of ${escapeHtml(sel)}</button>
+  `;
+  document.getElementById('graph-simulate').onclick = () => { selectPkg(sel); state.tab='sim'; state.simMode='single'; state.simSeeds=[sel]; render(); startSimAnimation(); };
+  container.querySelectorAll('[data-node]').forEach(pill => pill.onclick = () => { selectPkg(pill.dataset.node); render(); });
+}
+
+/* ===================== SIMULATIONS TAB ===================== */
+function renderSimTab(el){
+  const modes = [
+    {id:'single', label:'Single Attack'},
+    {id:'multi', label:'Multi-Attack'},
+    {id:'attacker', label:"Attacker Strategy"},
+    {id:'defender', label:'Defender Strategy'},
+  ];
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h3>Compromise Simulator</h3></div>
+      <div class="subtab-row">${modes.map(m=>`<button class="subtab ${state.simMode===m.id?'active':''}" data-mode="${m.id}">${m.label}</button>`).join('')}</div>
+      <div id="sim-controls"></div>
+    </div>
+    <div class="grid2">
+      <div class="card graph-card">
+        <div class="graph-toolbar"><h3>Propagation</h3>
+          <button class="btn btn-ghost" id="sim-play">${icon('play',13)} Play</button>
+        </div>
+        <div class="graph-wrap"><svg id="sim-graph"></svg></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Results</h3></div>
+        <div id="sim-results"></div>
+      </div>
+    </div>
+  `;
+  el.querySelectorAll('[data-mode]').forEach(b=> b.onclick = () => {
+    state.simMode = b.dataset.mode; state.simLevel=-1;
+    if(state.simMode==='attacker'){
+      const top = rankByBlastRadius(1)[0];
+      if(top){ state.simSeeds=[top.n]; selectPkg(top.n); }
+    }
+    render();
+  });
+  renderSimControls();
+  renderSimGraphAndResults();
+  document.getElementById('sim-play').onclick = startSimAnimation;
+}
+
+function renderSimControls(){
+  const container = document.getElementById('sim-controls');
+  const nonRoot = Object.keys(PKG);
+  if(state.simMode==='single'){
+    container.innerHTML = `<div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:12.5px; font-weight:600; color:var(--ink-2);">Compromise:</span>
+      <select id="seed-select" style="padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-size:13px;">
+        ${nonRoot.map(n=>`<option value="${n}" ${state.simSeeds[0]===n?'selected':''}>${n}${n===FEATURED?'  (has real CVE)':''}</option>`).join('')}
+      </select></div>`;
+    document.getElementById('seed-select').onchange = (e)=>{ selectPkg(e.target.value); state.simSeeds=[e.target.value]; state.simLevel=-1; renderSimGraphAndResults(); };
+  } else if(state.simMode==='multi'){
+    const candidates = Object.entries(PKG).sort((a,b)=>b[1].ripple_risk_score-a[1].ripple_risk_score).slice(0,6).map(([n])=>n);
+    container.innerHTML = `<div style="font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:8px;">Select packages (coordinated attack):</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${candidates.map(n=>`<label style="display:flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" value="${n}" ${state.simSeeds.includes(n)?'checked':''} /> ${n}</label>`).join('')}
+      </div>`;
+    container.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+      const checked = [...container.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+      state.simSeeds = checked.length? checked : [FEATURED]; state.simLevel=-1; renderSimGraphAndResults();
+    });
+  } else if(state.simMode==='attacker'){
+    const ranked = rankByBlastRadius(5);
+    container.innerHTML = `<div style="font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:8px;">Ranked by blast radius &middot; click a row to preview its propagation below:</div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>Package</th><th>Apps hit</th><th>Packages hit</th><th>Depth</th></tr></thead><tbody>
+      ${ranked.map((x,i)=>`<tr class="${state.simSeeds[0]===x.n?'row-hot':''}" style="cursor:pointer" data-seed="${x.n}"><td><span class="rank">${i+1}</span></td><td><b>${x.n}</b></td><td>${x.r.appsAffected.length}</td><td>${x.r.pkgsAffected.length}</td><td>${x.r.maxDepth}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    container.querySelectorAll('[data-seed]').forEach(tr=> tr.onclick=()=>{ selectPkg(tr.dataset.seed); state.simSeeds=[tr.dataset.seed]; state.simLevel=-1; render(); });
+  } else if(state.simMode==='defender'){
+    const candidates = Object.entries(PKG).sort((a,b)=>b[1].ripple_risk_score-a[1].ripple_risk_score).slice(0,6).map(([n])=>n);
+    const pickerHTML = `
+      <div style="font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:8px;">Compromised package(s) &mdash; check more than one to defend a coordinated attack:</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        ${candidates.map(n=>`<label style="display:flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12.5px; cursor:pointer;">
+          <input type="checkbox" class="def-seed-cb" value="${n}" ${state.simSeeds.includes(n)?'checked':''} /> ${n}</label>`).join('')}
+      </div>`;
+
+    const def = currentDefense();
+    let bodyHTML;
+    if(!def){
+      bodyHTML = `<div class="empty-hint">No interventions modeled for ${escapeHtml(state.simSeeds.join(', ')||FEATURED)}.</div>`;
+    } else if(def.multi){
+      const { before, after, chosen, seeds } = def;
+      const spreadChanged = before.appsAffected.length !== after.appsAffected.length || before.pkgsAffected.length !== after.pkgsAffected.length;
+      const seedScores = seeds.map(s => ({ s, before: scoreOf(s), after: targetScoreAfter(s, chosen.find(a=>a.target===s)) }));
+      const worst = seedScores.reduce((a,b)=> b.before>a.before?b:a, seedScores[0]);
+      bodyHTML = `<div style="font-size:12.5px; color:var(--ink-2);">Coordinated attack on <b>${seeds.join(', ')}</b> &middot; combined firebreak: <b>${chosen.length}</b> action${chosen.length!==1?'s':''}</div>
+        <div class="metric-row" style="margin-top:10px;">
+          <div class="metric-box"><div class="mv">${before.appsAffected.length} &rarr; ${after.appsAffected.length}</div><div class="ml">apps affected</div></div>
+          <div class="metric-box"><div class="mv">${before.pkgsAffected.length} &rarr; ${after.pkgsAffected.length}</div><div class="ml">packages affected</div></div>
+          <div class="metric-box"><div class="mv" style="color:${worst.after<worst.before?'var(--low)':'var(--ink)'}">${fmt1(worst.before)} &rarr; ${fmt1(worst.after)}</div><div class="ml">${escapeHtml(worst.s)} risk /100</div></div>
+        </div>
+        ${chosen.length ? `<div style="margin-top:12px;">${chosen.map(a=>`
+          <div class="action-row">
+            <div class="action-check done">${icon('check',13)}</div>
+            <div class="action-body"><div class="action-title">${a.label}</div></div>
+          </div>`).join('')}</div>` : `<div class="empty-hint">No candidate action reduces the combined blast radius.</div>`}
+        ${spreadChanged ? '' : `<div class="meta-line">These actions neutralize the vulnerabilities themselves but don't remove any service's structural dependency on them &mdash; see Optimization for a deeper containment plan.</div>`}`;
+    } else {
+      const { before, best, seed } = def;
+      const spreadChanged = before.appsAffected.length !== best.after.appsAffected.length || before.pkgsAffected.length !== best.after.pkgsAffected.length;
+      const scoreBefore = scoreOf(seed), scoreAfter = targetScoreAfter(seed, best);
+      bodyHTML = `<div style="font-size:12.5px; color:var(--ink-2);">Attack on <b>${seed}</b> &middot; best immediate defense: <b>${best.label}</b></div>
+        <div class="metric-row" style="margin-top:10px;">
+          <div class="metric-box"><div class="mv">${before.appsAffected.length} &rarr; ${best.after.appsAffected.length}</div><div class="ml">apps affected</div></div>
+          <div class="metric-box"><div class="mv">${before.pkgsAffected.length} &rarr; ${best.after.pkgsAffected.length}</div><div class="ml">packages affected</div></div>
+          <div class="metric-box"><div class="mv" style="color:${scoreAfter<scoreBefore?'var(--low)':'var(--ink)'}">${fmt1(scoreBefore)} &rarr; ${fmt1(scoreAfter)}</div><div class="ml">${escapeHtml(seed)} risk /100</div></div>
+        </div>
+        ${spreadChanged ? '' : `<div class="meta-line">This neutralizes the vulnerability in <b>${seed}</b> itself but doesn't remove any service's structural dependency on it &mdash; see Optimization for a full containment plan.</div>`}`;
+    }
+
+    container.innerHTML = pickerHTML + bodyHTML;
+    container.querySelectorAll('.def-seed-cb').forEach(cb => cb.onchange = () => {
+      const checked = [...container.querySelectorAll('.def-seed-cb:checked')].map(c=>c.value);
+      state.simSeeds = checked.length ? checked : [FEATURED];
+      state.simLevel = -1;
+      selectPkg(state.simSeeds[0]);
+      renderSimControls();
+      renderSimGraphAndResults();
+    });
+  }
+}
+
+/* The defense currently in effect for the Sim tab -- only meaningful in
+   Defender Strategy mode. Shared by the controls panel and the propagation
+   graph/results/timeline below so the whole tab tells one consistent story
+   instead of the graph showing the raw (undefended) spread next to numbers
+   that claim it was contained. */
+function currentDefense(){
+  if(state.simMode !== 'defender') return null;
+  const seeds = state.simSeeds.length ? state.simSeeds : [FEATURED];
+  if(seeds.length > 1){
+    const res = bestContainmentForMulti(seeds);
+    return res ? Object.assign({ seeds, multi: true }, res) : null;
+  }
+  const seed = seeds[0];
+  const res = bestContainmentFor(seed);
+  return res ? Object.assign({ seed, seeds, multi: false }, res) : null;
+}
+function currentSimAdj(){
+  const def = currentDefense();
+  if(!def) return { FWD, REV };
+  return def.multi ? def.adj : def.best.adj;
+}
+
+function renderSimGraphAndResults(){
+  const adj = currentSimAdj();
+  const r = blastRadius(state.simSeeds, adj);
+  const highlightSet = new Set(state.simLevel<0 ? r.affected.concat(state.simSeeds) : [...state.simSeeds, ...r.affected.filter(n=>r.levels[n]<=state.simLevel)]);
+  drawGraph('sim-graph', { highlight: highlightSet, onClick:id=>{ state.selected=id; } });
+  document.getElementById('sim-results').innerHTML = `
+    <div class="metric-row">
+      <div class="metric-box"><div class="mv">${r.appsAffected.length}</div><div class="ml">services / apps</div></div>
+      <div class="metric-box"><div class="mv">${r.pkgsAffected.length}</div><div class="ml">packages</div></div>
+      <div class="metric-box"><div class="mv">${r.maxDepth}</div><div class="ml">propagation depth</div></div>
+    </div>
+    <div id="sim-timeline"></div>
+  `;
+  renderTimeline(adj);
+}
+function renderTimeline(adj){
+  const r = blastRadius(state.simSeeds, adj);
+  const maxL = r.maxDepth;
+  const rows = [`<div class="action-row"><div class="action-check done">${icon('check',13)}</div><div class="action-body"><div class="action-title">T+0 &middot; Compromised</div><div class="action-meta">${state.simSeeds.join(', ')}</div></div></div>`];
+  for(let l=1; l<=maxL; l++){
+    const atLevel = r.affected.filter(n=>r.levels[n]===l);
+    if(!atLevel.length) continue;
+    rows.push(`<div class="action-row" style="opacity:${state.simLevel<0||state.simLevel>=l?1:0.35}">
+      <div class="action-check ${state.simLevel<0||state.simLevel>=l?'done':''}">${icon('check',13)}</div>
+      <div class="action-body"><div class="action-title">T+${l}</div><div class="action-meta">${atLevel.join(', ')}</div></div>
+    </div>`);
+  }
+  document.getElementById('sim-timeline').innerHTML = rows.join('');
+}
+let simTimer = null;
+function startSimAnimation(){
+  state.tab='sim'; render();
+  const r = blastRadius(state.simSeeds, currentSimAdj());
+  clearInterval(simTimer); state.simLevel = -1;
+  simTimer = setInterval(()=>{
+    state.simLevel++;
+    if(state.simLevel > r.maxDepth){ clearInterval(simTimer); return; }
+    renderSimGraphAndResults();
+  }, 700);
+}
+
+/* ===================== OPTIMIZATION TAB ===================== */
+function sortScored(list){
+  const {key,dir} = state.optSort;
+  const mul = dir==='asc' ? 1 : -1;
+  return list.slice().sort((a,b)=>{
+    let av=a[key], bv=b[key];
+    if(typeof av==='string') return av.localeCompare(bv)*mul;
+    return (av-bv)*mul;
+  });
+}
+function renderOptTab(el){
+  const target = PKG[state.optScenario] ? state.optScenario : FEATURED;
+  const targetP = PKG[target];
+  const base = totalRisk(cloneAdj(), {});
+  const pool = candidateActionsFor(target);
+  const scored = pool.map(a => {
+    const {adj, overrides} = evaluateAction(a, cloneAdj(), {});
+    const after = totalRisk(adj, overrides);
+    const reduction = Math.max(0, (base-after)/base*100);
+    return Object.assign({}, a, { reduction, ratio: reduction/a.effortW, after });
+  }).sort((x,y)=>y.ratio-x.ratio);
+  const recommended = scored[0];
+  const tableRows = sortScored(scored);
+  const cols = [ {k:'label', t:'Action'}, {k:'reduction', t:'Reduction'}, {k:'effortW', t:'Effort'}, {k:'ratio', t:'Priority'} ];
+  const scenarioOptions = Object.keys(PKG).sort((a,b)=>scoreOf(b)-scoreOf(a));
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head">
+        <h3>Dependency Firebreak Optimizer</h3>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <select id="opt-scenario-select" style="padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-size:12.5px; font-weight:600;">
+            ${scenarioOptions.map(n=>`<option value="${n}" ${target===n?'selected':''}>Compromise of ${n}${n===FEATURED?' (real CVE)':''}</option>`).join('')}
+          </select>
+          <span class="pill pill-${bucket(scoreOf(target))}">${bucketLabel(bucket(scoreOf(target)))} &middot; ${fmt1(scoreOf(target))}/100</span>
+        </div>
+      </div>
+      ${pool.length ? `<div id="firebreak-list"></div>` : `<div class="empty-hint">No services depend on ${target}, so no intervention changes the portfolio's risk.</div>`}
+    </div>
+
+    <div class="grid2b">
+      <div class="card">
+        <div class="card-head"><h3>Minimum Intervention Set</h3></div>
+        <div class="slider-row">
+          <input type="range" id="mis-slider" min="10" max="70" step="5" value="${Math.round(state.misTarget*100)}" />
+          <div class="slider-val" id="mis-slider-val">-${Math.round(state.misTarget*100)}%</div>
+        </div>
+        <div id="mis-result"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Risk-Reduction / Effort Ranking</h3></div>
+        ${tableRows.length ? `<div class="table-wrap"><table><thead><tr>
+          ${cols.map(c=>`<th class="sortable" data-sort="${c.k}">${c.t}${state.optSort.key===c.k?`<span class="arrow">${state.optSort.dir==='asc'?'&uarr;':'&darr;'}</span>`:''}</th>`).join('')}
+        </tr></thead><tbody>
+          ${tableRows.map(a=>`<tr><td>${a.label}</td><td class="num">${pct(a.reduction)}</td><td>${a.effort}</td><td>${a.ratio>10?`<span class="pill pill-low">Very High</span>`:a.ratio>5?`<span class="pill pill-med">Medium</span>`:`<span class="pill" style="background:var(--surface-2); color:var(--muted);">Low</span>`}</td></tr>`).join('')}
+        </tbody></table></div>` : `<div class="empty-hint">No interventions modeled for this package.</div>`}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('opt-scenario-select').onchange = (e) => { state.optScenario = e.target.value; renderOptTab(el); };
+
+  if(pool.length){
+    document.getElementById('firebreak-list').innerHTML = scored.slice(0,3).map((a,i)=>`
+      <div class="action-row ${a.id===recommended.id?'action-row-rec':''}">
+        <div class="rank">${String.fromCharCode(65+i)}</div>
+        <div class="action-body">
+          <div class="action-title">${a.label}</div>
+          <div class="action-meta">${a.time} &middot; ${a.effort} effort</div>
+        </div>
+        <div class="fb-delta">
+          ${a.id===recommended.id?'<span class="badge-rec">Recommended</span>':''}
+          <span class="fb-delta-num">-${pct(a.reduction)} risk</span>
+        </div>
+      </div>`).join('');
+  }
+
+  el.querySelectorAll('th.sortable').forEach(th => {
+    th.onclick = () => {
+      const key = th.dataset.sort;
+      if(state.optSort.key===key) state.optSort.dir = state.optSort.dir==='asc'?'desc':'asc';
+      else state.optSort = { key, dir: key==='label'?'asc':'desc' };
+      renderOptTab(el);
+    };
+  });
+
+  function renderMis(pct100){
+    state.misTarget = pct100/100;
+    const res = minimumInterventionSet(target, state.misTarget);
+    const met = res.after <= res.target + 0.05;
+    document.getElementById('mis-result').innerHTML = res.chosen.length===0 && !pool.length ? `
+      <div class="empty-hint">No interventions modeled for this package.</div>
+    ` : `
+      <div class="metric-row">
+        <div class="metric-box"><div class="mv">${fmt1(res.before)}</div><div class="ml">current risk</div></div>
+        <div class="metric-box"><div class="mv">${fmt1(res.after)}</div><div class="ml">target &lt; ${fmt1(res.target)}</div></div>
+        <div class="metric-box"><div class="mv">${res.chosen.length}</div><div class="ml">interventions${met?'':' (best available)'}</div></div>
+      </div>
+      <div style="margin-top:8px;">
+        ${res.chosen.map((a,i)=>`<div class="action-row"><div class="action-check done">${icon('check',13)}</div><div class="action-body"><div class="action-title">${i+1}. ${a.label}</div><div class="action-meta">${a.effort} effort &middot; ${a.time}</div></div></div>`).join('') || '<div class="empty-hint">Target already met.</div>'}
+      </div>`;
+  }
+  const slider = document.getElementById('mis-slider');
+  slider.oninput = (e) => { document.getElementById('mis-slider-val').textContent = '-'+e.target.value+'%'; renderMis(parseInt(e.target.value)); };
+  renderMis(parseInt(slider.value));
+}
+
+/* ===================== REPORTS TAB ===================== */
+function renderReportsTab(el){
+  el.innerHTML = `
+    <div class="grid2b">
+      <div class="card">
+        <div class="card-head"><h3>Project Summary</h3></div>
+        <div class="info-note">
+          This portfolio scan covers <b>${ROOTS.length} services</b> (${ROOTS.join(', ')}) built on <b>${Object.keys(PKG).length} packages</b>.
+          Total risk score is <b class="num">${fmt1(DATA.total_risk_score)}/100</b>. The featured critical dependency is
+          <b>${FEATURED}</b> (${DATA.advisory.cve}, CVSS ${DATA.advisory.cvss}), reaching ${PKG[FEATURED].apps_affected_count} of ${ROOTS.length} services directly.
+          Structural analysis additionally flags <b>ms</b> and <b>debug</b> as higher blast-radius risk than ${FEATURED} itself, despite
+          neither having a known CVE on file -- exactly the class of risk a CVE-only scanner would miss.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Historical Backtesting</h3></div>
+        <div id="incidents"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Methodology &amp; Data Notes</h3></div>
+      <div class="info-note">${DATA.methodology_note}</div>
+    </div>
+  `;
+  document.getElementById('incidents').innerHTML = DATA.incidents.map(inc => `
+    <div class="action-row">
+      <div class="crit-icon" style="width:30px;height:30px;background:var(--med-soft); color:var(--med);">${icon('alert',15)}</div>
+      <div class="action-body">
+        <div class="action-title">${inc.name} <span style="font-weight:500; color:var(--muted);">&middot; ${inc.date}</span></div>
+        <div class="action-meta">${inc.description}</div>
+        <div style="margin-top:5px;">${inc.pattern.map(p=>`<span class="pill pill-accent" style="margin:2px 4px 2px 0;">${p}</span>`).join('')}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ===================== render dispatcher / init ===================== */
+function render(){
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab===state.tab));
+  const el = document.getElementById('content');
+  if(state.tab==='overview') renderOverview(el);
+  else if(state.tab==='live') renderLiveTab(el);
+  else if(state.tab==='cf') renderCfTab(el);
+  else if(state.tab==='graph') renderGraphTab(el);
+  else if(state.tab==='sim') renderSimTab(el);
+  else if(state.tab==='opt') renderOptTab(el);
+  else if(state.tab==='upload') renderUploadTab(el);
+  else if(state.tab==='reports') renderReportsTab(el);
+}
+
+document.getElementById('nav').addEventListener('click', (e) => {
+  const b = e.target.closest('.nav-item'); if(!b) return;
+  clearInterval(simTimer);
+  state.tab = b.dataset.tab; render();
+});
+document.getElementById('runSimBtn').onclick = () => { selectPkg(FEATURED); state.simSeeds=[FEATURED]; state.simMode='single'; startSimAnimation(); };
+document.getElementById('themeToggle').onclick = () => {
+  const root = document.documentElement;
+  const cur = root.getAttribute('data-theme');
+  const next = cur==='dark' ? 'light' : (cur==='light' ? null : 'dark');
+  if(next) root.setAttribute('data-theme', next); else root.removeAttribute('data-theme');
+  render();
+};
+document.getElementById('searchBox').addEventListener('input', (e) => {
+  state.filter = e.target.value.toLowerCase();
+  if(state.tab==='overview' || state.tab==='graph') render();
+});
+document.getElementById('searchBox').addEventListener('keydown', (e) => {
+  if(e.key==='Enter' && state.filter){
+    const match = Object.keys(PKG).find(n=>n.toLowerCase().includes(state.filter));
+    if(match){ state.selected = match; state.tab='graph'; render(); }
+  }
+});
+
+render();
+// Best-effort live check, fired once on load. If the browser can't reach
+// OSV.dev (offline, blocked network), this simply settles into the
+// "unavailable" state rendered by renderLiveMonitor -- it never fakes data.
+runLiveScan();
+
+</script>
+</body>
+</html>
